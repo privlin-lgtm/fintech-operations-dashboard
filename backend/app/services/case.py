@@ -39,7 +39,7 @@ VALID_TRANSITIONS: dict[str, set[str]] = {
     "escalated": {"in_progress", "closed_resolved", "closed_no_action"},
 }
 
-SLA_HOURS = {"low": 120, "medium": 72, "high": 24, "critical": 4}
+from app.core.sla import SLA_HOURS
 
 
 class CaseService:

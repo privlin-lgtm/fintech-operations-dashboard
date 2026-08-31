@@ -158,3 +158,69 @@ async def make_transaction(db_session: AsyncSession, make_account):
 
     return _make
 
+
+@pytest_asyncio.fixture
+async def make_case(db_session: AsyncSession, make_customer):
+    from datetime import UTC, datetime, timedelta
+
+    from app.models.case import Case
+    from app.repositories.case import CaseRepository
+
+    repo = CaseRepository(db_session)
+
+    async def _make(*, customer_id=None, **kwargs) -> Case:
+        if customer_id is None:
+            customer = await make_customer()
+            customer_id = customer.id
+        case_number = await repo.next_case_number()
+        case = Case(case_number=case_number, customer_id=customer_id, case_type="fraud", **kwargs)
+        if "status" not in kwargs:
+            case.status = "new"
+        if "priority" not in kwargs:
+            case.priority = "medium"
+        if "sla_due_at" not in kwargs and case.sla_due_at is None:
+            case.sla_due_at = datetime.now(UTC) + timedelta(hours=72)
+        if case.status.startswith("closed"):
+            if case.resolution_code is None:
+                case.resolution_code = "fraud_confirmed"
+            if case.closing_summary is None:
+                case.closing_summary = "Closed in test fixture"
+            if case.closed_at is None:
+                case.closed_at = datetime.now(UTC)
+        db_session.add(case)
+        await db_session.flush()
+        return case
+
+    return _make
+
+
+@pytest_asyncio.fixture
+async def make_alert(db_session: AsyncSession, make_customer):
+    from datetime import UTC, datetime
+
+    from app.models.alert import Alert
+
+    async def _make(*, customer_id=None, **kwargs) -> Alert:
+        if customer_id is None:
+            customer = await make_customer()
+            customer_id = customer.id
+        alert = Alert(
+            customer_id=customer_id,
+            alert_type=kwargs.pop("alert_type", "manual_watchlist"),
+            severity=kwargs.pop("severity", "low"),
+            triggering_reason=kwargs.pop("triggering_reason", "Test alert"),
+            **kwargs,
+        )
+        if "status" not in kwargs:
+            alert.status = "new"
+        if alert.status == "resolved":
+            if alert.dismissal_reason is None:
+                alert.dismissal_reason = "Resolved in test fixture"
+            if alert.resolved_at is None:
+                alert.resolved_at = datetime.now(UTC)
+        db_session.add(alert)
+        await db_session.flush()
+        return alert
+
+    return _make
+
