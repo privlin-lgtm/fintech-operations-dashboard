@@ -92,6 +92,7 @@ create table customers (
 create index ix_customers_email_trgm on customers using gin ((email::text) gin_trgm_ops) where deleted_at is null;
 create index ix_customers_name_trgm  on customers using gin (full_name gin_trgm_ops) where deleted_at is null;
 create index ix_customers_phone      on customers (phone) where deleted_at is null;
+create index ix_customers_phone_trgm on customers using gin (phone gin_trgm_ops) where deleted_at is null;
 create index ix_customers_risk_tier  on customers (risk_tier) where deleted_at is null;
 
 create trigger trg_customers_updated_at
@@ -286,3 +287,23 @@ create index ix_reports_next_run_at on reports (next_run_at) where deleted_at is
 create trigger trg_reports_updated_at
 before update on reports
 for each row execute function set_updated_at();
+
+
+-- ============================================================================
+-- 10. audit_logs  (FR-SYS-3 — immutable record of sensitive reads and writes)
+-- ============================================================================
+create table audit_logs (
+    id            uuid primary key default gen_random_uuid(),
+    actor_id      uuid references users(id) on delete set null,
+    action        text not null,
+    resource_type text not null,
+    resource_id   uuid not null,
+    metadata      jsonb not null default '{}'::jsonb,
+    ip_address    inet,
+    created_at    timestamptz not null default now()
+    -- no updated_at / deleted_at: insert-only, a correction is a new row, not an edit.
+);
+
+create index ix_audit_logs_resource   on audit_logs (resource_type, resource_id);
+create index ix_audit_logs_actor_id   on audit_logs (actor_id);
+create index ix_audit_logs_created_at on audit_logs (created_at);

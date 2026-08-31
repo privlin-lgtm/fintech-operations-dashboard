@@ -1,9 +1,9 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from app.core.pagination import Cursor
 from app.models.transaction import Transaction
 from app.repositories.base import BaseRepository
 
@@ -11,12 +11,9 @@ from app.repositories.base import BaseRepository
 class TransactionRepository(BaseRepository[Transaction]):
     model = Transaction
 
-    def _active(self):
-        return select(Transaction).where(Transaction.deleted_at.is_(None))
-
     async def get_detail(self, transaction_id: UUID) -> Transaction | None:
         stmt = (
-            self._active()
+            self._base_query()
             .options(selectinload(Transaction.account))
             .where(Transaction.id == transaction_id)
         )
@@ -34,9 +31,9 @@ class TransactionRepository(BaseRepository[Transaction]):
         status: str | None = None,
         channel: str | None = None,
         limit: int,
-        offset: int,
+        cursor: Cursor | None = None,
     ) -> list[Transaction]:
-        stmt = self._active().order_by(Transaction.created_at.desc())
+        stmt = self._base_query()
         if account_id:
             stmt = stmt.where(Transaction.account_id == account_id)
         if from_date:
@@ -51,5 +48,6 @@ class TransactionRepository(BaseRepository[Transaction]):
             stmt = stmt.where(Transaction.status == status)
         if channel:
             stmt = stmt.where(Transaction.channel == channel)
-        result = await self.session.execute(stmt.limit(limit + 1).offset(offset))
+        stmt = self._keyset_page(stmt, cursor=cursor, limit=limit)
+        result = await self.session.execute(stmt)
         return list(result.scalars().all())

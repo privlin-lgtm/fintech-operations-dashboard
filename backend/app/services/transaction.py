@@ -1,10 +1,10 @@
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.pagination import decode_cursor, encode_cursor
+from app.core.exceptions import NotFoundError
+from app.core.pagination import decode_cursor, paginate
 from app.repositories.transaction import TransactionRepository
 from app.schemas.base import PaginatedResponse
 from app.schemas.transaction import TransactionRead
@@ -17,7 +17,7 @@ class TransactionService:
     async def get_by_id(self, transaction_id: UUID) -> TransactionRead:
         txn = await self.repo.get_detail(transaction_id)
         if txn is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found")
+            raise NotFoundError("transaction", transaction_id)
         return TransactionRead.model_validate(txn)
 
     async def search(
@@ -33,7 +33,7 @@ class TransactionService:
         limit: int = 25,
         cursor: str | None = None,
     ) -> PaginatedResponse[TransactionRead]:
-        offset = decode_cursor(cursor) if cursor else 0
+        parsed_cursor = decode_cursor(cursor) if cursor else None
         rows = await self.repo.search(
             account_id=account_id,
             from_date=from_date,
@@ -43,12 +43,11 @@ class TransactionService:
             status=status,
             channel=channel,
             limit=limit,
-            offset=offset,
+            cursor=parsed_cursor,
         )
-        has_more = len(rows) > limit
-        items = rows[:limit]
+        items, next_cursor = paginate(rows, limit)
         return PaginatedResponse(
             items=[TransactionRead.model_validate(t) for t in items],
-            next_cursor=encode_cursor(offset + limit) if has_more else None,
+            next_cursor=next_cursor,
             limit=limit,
         )

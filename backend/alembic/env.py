@@ -11,6 +11,7 @@ from app.db.base import Base
 from app.models import Role, User  # noqa: F401 — register models with metadata
 from app.models.account import Account  # noqa: F401
 from app.models.alert import Alert  # noqa: F401
+from app.models.audit_log import AuditLog  # noqa: F401
 from app.models.case import Case, CaseNote, CaseTransactionLink  # noqa: F401
 from app.models.customer import Customer  # noqa: F401
 from app.models.report import Report  # noqa: F401

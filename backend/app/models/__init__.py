@@ -1,5 +1,6 @@
 from app.models.account import Account
 from app.models.alert import Alert
+from app.models.audit_log import AuditLog
 from app.models.case import Case, CaseNote, CaseTransactionLink
 from app.models.customer import Customer
 from app.models.report import Report
@@ -10,6 +11,7 @@ from app.models.user import User
 __all__ = [
     "Account",
     "Alert",
+    "AuditLog",
     "Case",
     "CaseNote",
     "CaseTransactionLink",

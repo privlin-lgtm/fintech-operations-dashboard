@@ -4,6 +4,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
+from app.core.pagination import Cursor
 from app.models.case import Case, CaseNote, CaseTransactionLink
 from app.repositories.base import BaseRepository
 
@@ -11,23 +12,25 @@ from app.repositories.base import BaseRepository
 class CaseRepository(BaseRepository[Case]):
     model = Case
 
-    def _active(self):
-        return select(Case).where(Case.deleted_at.is_(None))
-
     async def get_detail(self, case_id: UUID) -> Case | None:
-        stmt = (
-            self._active()
-            .options(selectinload(Case.notes))
-            .where(Case.id == case_id)
-        )
+        stmt = self._base_query().options(selectinload(Case.notes)).where(Case.id == case_id)
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def list_by_customer(self, customer_id: UUID) -> list[Case]:
+    async def list_by_customer(
+        self, customer_id: UUID, *, cursor: Cursor | None = None, limit: int = 25
+    ) -> list[Case]:
+        stmt = self._base_query().where(Case.customer_id == customer_id)
+        stmt = self._keyset_page(stmt, cursor=cursor, limit=limit)
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def list_recent_by_customer(self, customer_id: UUID, *, limit: int = 5) -> list[Case]:
         stmt = (
-            self._active()
+            self._base_query()
             .where(Case.customer_id == customer_id)
-            .order_by(Case.created_at.desc())
+            .order_by(Case.created_at.desc(), Case.id.desc())
+            .limit(limit)
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
@@ -40,9 +43,9 @@ class CaseRepository(BaseRepository[Case]):
         assignee: UUID | None = None,
         sla_risk: bool | None = None,
         limit: int,
-        offset: int,
+        cursor: Cursor | None = None,
     ) -> list[Case]:
-        stmt = self._active().order_by(Case.created_at.desc())
+        stmt = self._base_query()
         if status:
             stmt = stmt.where(Case.status == status)
         if priority:
@@ -56,7 +59,8 @@ class CaseRepository(BaseRepository[Case]):
                 Case.sla_due_at <= now,
                 Case.status.not_like("closed%"),
             )
-        result = await self.session.execute(stmt.limit(limit + 1).offset(offset))
+        stmt = self._keyset_page(stmt, cursor=cursor, limit=limit)
+        result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
     async def next_case_number(self) -> str:

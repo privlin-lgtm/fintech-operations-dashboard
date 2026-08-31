@@ -2,60 +2,69 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 
-from app.core.dependencies import get_current_user, get_customer_service
+from app.core.dependencies import get_customer_service, require_roles
 from app.models.user import User
 from app.schemas.account import AccountRead
 from app.schemas.alert import AlertRead
 from app.schemas.base import PaginatedResponse
 from app.schemas.case import CaseRead
-from app.schemas.customer import CustomerProfile, CustomerRead
+from app.schemas.customer import CustomerProfile, CustomerRead, CustomerSearchParams
 from app.services.customer import CustomerService
 
 router = APIRouter(prefix="/customers", tags=["customers"])
 
+# Every role that touches customer PII at all (SEC-2). Compliance/Auditor gets
+# the same read access as everyone else here — its distinguishing extra is
+# audit-log visibility, not customer-record visibility.
+CUSTOMER_READ_ROLES = ("analyst", "investigator", "team_lead", "compliance_auditor", "admin")
+
 
 @router.get("", response_model=PaginatedResponse[CustomerRead])
 async def search_customers(
-    q: str | None = Query(default=None),
-    limit: int = Query(default=25, ge=1, le=200),
-    cursor: str | None = Query(default=None),
-    _user: User = Depends(get_current_user),
+    params: CustomerSearchParams = Query(),
+    _user: User = Depends(require_roles(*CUSTOMER_READ_ROLES)),
     service: CustomerService = Depends(get_customer_service),
 ) -> PaginatedResponse[CustomerRead]:
-    return await service.search(query=q, limit=limit, cursor=cursor)
+    return await service.search(query=params.q, limit=params.limit, cursor=params.cursor)
 
 
 @router.get("/{customer_id}", response_model=CustomerProfile)
 async def get_customer(
     customer_id: UUID,
-    _user: User = Depends(get_current_user),
+    current_user: User = Depends(require_roles(*CUSTOMER_READ_ROLES)),
     service: CustomerService = Depends(get_customer_service),
 ) -> CustomerProfile:
-    return await service.get_profile(customer_id)
+    return await service.get_profile(customer_id, viewer=current_user)
 
 
-@router.get("/{customer_id}/accounts", response_model=list[AccountRead])
+@router.get("/{customer_id}/accounts", response_model=PaginatedResponse[AccountRead])
 async def list_customer_accounts(
     customer_id: UUID,
-    _user: User = Depends(get_current_user),
+    limit: int = Query(default=25, ge=1, le=200),
+    cursor: str | None = Query(default=None),
+    current_user: User = Depends(require_roles(*CUSTOMER_READ_ROLES)),
     service: CustomerService = Depends(get_customer_service),
-) -> list[AccountRead]:
-    return await service.list_accounts(customer_id)
+) -> PaginatedResponse[AccountRead]:
+    return await service.list_accounts(customer_id, viewer=current_user, limit=limit, cursor=cursor)
 
 
-@router.get("/{customer_id}/cases", response_model=list[CaseRead])
+@router.get("/{customer_id}/cases", response_model=PaginatedResponse[CaseRead])
 async def list_customer_cases(
     customer_id: UUID,
-    _user: User = Depends(get_current_user),
+    limit: int = Query(default=25, ge=1, le=200),
+    cursor: str | None = Query(default=None),
+    current_user: User = Depends(require_roles(*CUSTOMER_READ_ROLES)),
     service: CustomerService = Depends(get_customer_service),
-) -> list[CaseRead]:
-    return await service.list_cases(customer_id)
+) -> PaginatedResponse[CaseRead]:
+    return await service.list_cases(customer_id, viewer=current_user, limit=limit, cursor=cursor)
 
 
-@router.get("/{customer_id}/alerts", response_model=list[AlertRead])
+@router.get("/{customer_id}/alerts", response_model=PaginatedResponse[AlertRead])
 async def list_customer_alerts(
     customer_id: UUID,
-    _user: User = Depends(get_current_user),
+    limit: int = Query(default=25, ge=1, le=200),
+    cursor: str | None = Query(default=None),
+    current_user: User = Depends(require_roles(*CUSTOMER_READ_ROLES)),
     service: CustomerService = Depends(get_customer_service),
-) -> list[AlertRead]:
-    return await service.list_alerts(customer_id)
+) -> PaginatedResponse[AlertRead]:
+    return await service.list_alerts(customer_id, viewer=current_user, limit=limit, cursor=cursor)

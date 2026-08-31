@@ -7,6 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import verify_token
 from app.db.session import get_db_session
 from app.models.user import User
+from app.repositories.account import AccountRepository
+from app.repositories.alert import AlertRepository
+from app.repositories.audit_log import AuditLogRepository
+from app.repositories.case import CaseRepository
+from app.repositories.customer import CustomerRepository
 from app.repositories.user import UserRepository
 from app.services.alert import AlertService
 from app.services.auth import AuthService
@@ -36,12 +41,6 @@ def get_user_repository(
     return UserRepository(session)
 
 
-def get_customer_service(
-    session: AsyncSession = Depends(get_session),
-) -> CustomerService:
-    return CustomerService(session)
-
-
 def get_transaction_service(
     session: AsyncSession = Depends(get_session),
 ) -> TransactionService:
@@ -58,6 +57,22 @@ def get_alert_service(
     session: AsyncSession = Depends(get_session),
 ) -> AlertService:
     return AlertService(session)
+
+
+def get_customer_service(
+    session: AsyncSession = Depends(get_session),
+    case_service: CaseService = Depends(get_case_service),
+    alert_service: AlertService = Depends(get_alert_service),
+) -> CustomerService:
+    return CustomerService(
+        customer_repo=CustomerRepository(session),
+        account_repo=AccountRepository(session),
+        case_repo=CaseRepository(session),
+        alert_repo=AlertRepository(session),
+        audit_repo=AuditLogRepository(session),
+        case_service=case_service,
+        alert_service=alert_service,
+    )
 
 
 def get_report_service(

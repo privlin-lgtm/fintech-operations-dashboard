@@ -1,10 +1,10 @@
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.pagination import decode_cursor, encode_cursor
+from app.core.exceptions import ConflictError, NotFoundError, ValidationConflictError
+from app.core.pagination import Cursor, decode_cursor, paginate
 from app.models.case import Case, CaseNote, CaseTransactionLink
 from app.models.user import User
 from app.repositories.case import CaseRepository
@@ -59,7 +59,7 @@ class CaseService:
     async def get_detail(self, case_id: UUID) -> CaseDetail:
         case = await self.repo.get_detail(case_id)
         if case is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
+            raise NotFoundError("case", case_id)
         return CaseDetail.model_validate(case)
 
     async def list_cases(
@@ -72,31 +72,36 @@ class CaseService:
         limit: int = 25,
         cursor: str | None = None,
     ) -> PaginatedResponse[CaseRead]:
-        offset = decode_cursor(cursor) if cursor else 0
+        parsed_cursor = decode_cursor(cursor) if cursor else None
         rows = await self.repo.search(
             status=status,
             priority=priority,
             assignee=assignee,
             sla_risk=sla_risk,
             limit=limit,
-            offset=offset,
+            cursor=parsed_cursor,
         )
-        has_more = len(rows) > limit
-        items = rows[:limit]
+        items, next_cursor = paginate(rows, limit)
         return PaginatedResponse(
             items=[CaseRead.model_validate(c) for c in items],
-            next_cursor=encode_cursor(offset + limit) if has_more else None,
+            next_cursor=next_cursor,
             limit=limit,
         )
+
+    async def list_for_customer(
+        self, customer_id: UUID, *, cursor: Cursor | None = None, limit: int = 25
+    ) -> list[Case]:
+        """Raw rows for a customer's cases — the single query CustomerService's
+        /customers/{id}/cases endpoint builds its paginated response from."""
+        return await self.repo.list_by_customer(customer_id, cursor=cursor, limit=limit)
 
     async def update(self, case_id: UUID, data: CaseUpdate, actor: User) -> CaseRead:
         case = await self._get_or_404(case_id)
         if data.status and data.status != case.status:
             allowed = VALID_TRANSITIONS.get(case.status, set())
             if data.status not in allowed:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail=f"Cannot transition from {case.status!r} to {data.status!r}",
+                raise ValidationConflictError(
+                    f"Cannot transition from {case.status!r} to {data.status!r}"
                 )
             case.status = data.status
             await self.repo.add_note(
@@ -140,7 +145,7 @@ class CaseService:
     async def close(self, case_id: UUID, data: CaseClose, actor: User) -> CaseRead:
         case = await self._get_or_404(case_id)
         if case.status.startswith("closed"):
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Case already closed")
+            raise ConflictError("Case already closed")
         case.status = data.status
         case.resolution_code = data.resolution_code
         case.closing_summary = data.closing_summary
@@ -172,5 +177,5 @@ class CaseService:
     async def _get_or_404(self, case_id: UUID) -> Case:
         case = await self.repo.get_detail(case_id)
         if case is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
+            raise NotFoundError("case", case_id)
         return case

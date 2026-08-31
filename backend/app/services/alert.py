@@ -1,10 +1,10 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.pagination import decode_cursor, encode_cursor
+from app.core.exceptions import ConflictError, NotFoundError, ValidationConflictError
+from app.core.pagination import Cursor, decode_cursor, paginate
 from app.models.alert import Alert
 from app.models.case import Case, CaseNote
 from app.models.user import User
@@ -20,9 +20,7 @@ class AlertService:
         self.case_repo = CaseRepository(session)
 
     async def get_by_id(self, alert_id: UUID) -> AlertRead:
-        alert = await self.repo.get_active_by_id(alert_id)
-        if alert is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
+        alert = await self._get_or_404(alert_id)
         return AlertRead.model_validate(alert)
 
     async def list_alerts(
@@ -34,26 +32,32 @@ class AlertService:
         limit: int = 25,
         cursor: str | None = None,
     ) -> PaginatedResponse[AlertRead]:
-        offset = decode_cursor(cursor) if cursor else 0
+        parsed_cursor = decode_cursor(cursor) if cursor else None
         rows = await self.repo.search(
             severity=severity,
             status=status,
             alert_type=alert_type,
             limit=limit,
-            offset=offset,
+            cursor=parsed_cursor,
         )
-        has_more = len(rows) > limit
-        items = rows[:limit]
+        items, next_cursor = paginate(rows, limit)
         return PaginatedResponse(
             items=[AlertRead.model_validate(a) for a in items],
-            next_cursor=encode_cursor(offset + limit) if has_more else None,
+            next_cursor=next_cursor,
             limit=limit,
         )
+
+    async def list_for_customer(
+        self, customer_id: UUID, *, cursor: Cursor | None = None, limit: int = 25
+    ) -> list[Alert]:
+        """Raw rows for a customer's alerts — backs CustomerService's
+        /customers/{id}/alerts endpoint so that query lives in one place."""
+        return await self.repo.list_by_customer(customer_id, cursor=cursor, limit=limit)
 
     async def dismiss(self, alert_id: UUID, data: AlertDismiss, actor: User) -> AlertRead:
         alert = await self._get_or_404(alert_id)
         if alert.status in ("dismissed", "escalated"):
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Alert already resolved")
+            raise ConflictError("Alert already resolved")
         alert.status = "dismissed"
         alert.dismissal_reason = data.reason
         alert.resolved_at = datetime.now(UTC)
@@ -66,7 +70,7 @@ class AlertService:
     ) -> AlertRead:
         alert = await self._get_or_404(alert_id)
         if alert.status == "dismissed":
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Alert is dismissed")
+            raise ConflictError("Alert is dismissed")
 
         case_id = data.case_id
         if case_id is None and data.create_case:
@@ -90,10 +94,7 @@ class AlertService:
             )
             case_id = created.id
         elif case_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Provide case_id or set create_case=true",
-            )
+            raise ValidationConflictError("Provide case_id or set create_case=true")
 
         alert.status = "escalated"
         alert.case_id = case_id
@@ -105,5 +106,5 @@ class AlertService:
     async def _get_or_404(self, alert_id: UUID) -> Alert:
         alert = await self.repo.get_active_by_id(alert_id)
         if alert is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
+            raise NotFoundError("alert", alert_id)
         return alert
