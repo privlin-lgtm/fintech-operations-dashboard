@@ -5,13 +5,18 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Select } from '@/components/ui/Select'
 import { Can } from '@/features/auth/Can'
-import { useDismissAlert, useEscalateAlert } from '@/features/alerts/hooks/useAlertSearch'
+import {
+  useAssignAlert,
+  useEscalateAlert,
+  useResolveAlert,
+} from '@/features/alerts/hooks/useAlertSearch'
 import type { ApiError } from '@/lib/api'
 import { CASE_PRIORITY_OPTIONS, CASE_TYPE_OPTIONS } from '@/types/case'
 import type { CasePriority, CaseType } from '@/types/case'
 import type { Alert } from '@/types/alert'
 
-type DismissValues = { reason: string }
+type AssignValues = { assigneeId: string }
+type ResolveValues = { reason: string }
 type EscalateExistingValues = { caseId: string }
 type EscalateNewValues = { caseType: CaseType; priority: CasePriority }
 
@@ -21,25 +26,72 @@ function errorMessage(error: unknown): string | null {
   return apiError.detail ?? apiError.message ?? 'Something went wrong.'
 }
 
-function DismissForm({ alertId }: { alertId: string }) {
-  const mutation = useDismissAlert(alertId)
-  const { register, handleSubmit, formState } = useForm<DismissValues>({
+function AssignForm({ alertId }: { alertId: string }) {
+  const mutation = useAssignAlert(alertId)
+  const { register, handleSubmit, reset, formState } = useForm<AssignValues>({
+    defaultValues: { assigneeId: '' },
+  })
+
+  const onSubmit = handleSubmit((values) => {
+    mutation.mutate(
+      { assignee_id: values.assigneeId },
+      { onSuccess: () => reset({ assigneeId: '' }) },
+    )
+  })
+
+  return (
+    <form
+      data-testid="assign-alert-form"
+      onSubmit={(event) => void onSubmit(event)}
+      className="space-y-3"
+    >
+      <div className="space-y-1.5">
+        <label htmlFor="assignee-id" className="block text-sm font-medium text-slate-700">
+          Assignee (user ID)
+        </label>
+        <input
+          id="assignee-id"
+          data-testid="assign-alert-assignee"
+          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+          placeholder="Analyst or investigator UUID"
+          {...register('assigneeId', { required: 'Choose who should own this alert.' })}
+        />
+        {formState.errors.assigneeId ? (
+          <p className="text-sm text-red-600">{formState.errors.assigneeId.message}</p>
+        ) : null}
+      </div>
+      {mutation.isError ? <p className="text-sm text-red-600">{errorMessage(mutation.error)}</p> : null}
+      <Button type="submit" size="sm" isLoading={mutation.isPending}>
+        Assign alert
+      </Button>
+    </form>
+  )
+}
+
+function ResolveForm({ alertId }: { alertId: string }) {
+  const mutation = useResolveAlert(alertId)
+  const { register, handleSubmit, formState } = useForm<ResolveValues>({
     defaultValues: { reason: '' },
   })
 
   const onSubmit = handleSubmit((values) => mutation.mutate(values))
 
   return (
-    <form onSubmit={(event) => void onSubmit(event)} className="space-y-3">
+    <form
+      data-testid="resolve-alert-form"
+      onSubmit={(event) => void onSubmit(event)}
+      className="space-y-3"
+    >
       <div className="space-y-1.5">
-        <label htmlFor="dismiss-reason" className="block text-sm font-medium text-slate-700">
-          Reason
+        <label htmlFor="resolve-reason" className="block text-sm font-medium text-slate-700">
+          Resolution reason
         </label>
         <input
-          id="dismiss-reason"
+          id="resolve-reason"
+          data-testid="resolve-alert-reason"
           className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
-          placeholder="Why doesn't this need investigation?"
-          {...register('reason', { required: 'A reason is required to dismiss an alert.' })}
+          placeholder="Why is this alert being closed?"
+          {...register('reason', { required: 'A reason is required to resolve an alert.' })}
         />
         {formState.errors.reason ? (
           <p className="text-sm text-red-600">{formState.errors.reason.message}</p>
@@ -47,7 +99,7 @@ function DismissForm({ alertId }: { alertId: string }) {
       </div>
       {mutation.isError ? <p className="text-sm text-red-600">{errorMessage(mutation.error)}</p> : null}
       <Button type="submit" size="sm" variant="secondary" isLoading={mutation.isPending}>
-        Dismiss
+        Resolve alert
       </Button>
     </form>
   )
@@ -127,16 +179,21 @@ function EscalateForm({ alertId }: { alertId: string }) {
 }
 
 export function AlertActionsPanel({ alert }: { alert: Alert }) {
-  const isResolved = alert.status === 'dismissed' || alert.status === 'escalated'
-  if (isResolved) {
+  const isTerminal = alert.status === 'resolved' || alert.status === 'escalated'
+  if (isTerminal) {
     return null
   }
 
   return (
     <Can permission="alert:write">
       <div className="grid gap-6 xl:grid-cols-2">
-        <Card title="Dismiss" description="No further action needed on this alert.">
-          <DismissForm alertId={alert.id} />
+        {alert.status === 'new' ? (
+          <Card title="Assign" description="Route this alert to an analyst or investigator.">
+            <AssignForm alertId={alert.id} />
+          </Card>
+        ) : null}
+        <Card title="Resolve" description="Close this alert with a documented reason.">
+          <ResolveForm alertId={alert.id} />
         </Card>
         <Card title="Escalate" description="Send this alert into a case investigation.">
           <EscalateForm alertId={alert.id} />

@@ -17,6 +17,7 @@ import {
   TableRow,
 } from '@/components/ui/Table'
 import { useCustomerProfile } from '@/features/customers/hooks/useCustomerSearch'
+import { OpenCasePanel } from '@/features/cases/components/OpenCasePanel'
 import { formatDateTime, formatLabel } from '@/lib/format'
 
 function StatBlock({ label, value }: { label: string; value: number }) {
@@ -88,6 +89,8 @@ export function CustomerDetailPage() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
+        <OpenCasePanel customerId={customer.id} />
+
         <Card title="Contact details">
           <dl className="space-y-3 text-sm">
             <div className="flex justify-between gap-4">

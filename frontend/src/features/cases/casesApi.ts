@@ -2,7 +2,7 @@ import { apiRequest } from '@/lib/api'
 import { buildQueryString, parseEnumParam } from '@/lib/format'
 import type { PaginatedResponse } from '@/types/api'
 import { CASE_PRIORITY_OPTIONS, CASE_STATUS_OPTIONS } from '@/types/case'
-import type { Case, CaseDetail, CaseSearchParams } from '@/types/case'
+import type { Case, CaseDetail, CasePriority, CaseSearchParams, CaseType } from '@/types/case'
 
 const STATUS_VALUES = CASE_STATUS_OPTIONS.map((option) => option.value)
 const PRIORITY_VALUES = CASE_PRIORITY_OPTIONS.map((option) => option.value)
@@ -20,6 +20,17 @@ export type CloseCaseInput = {
 export type ReassignCaseInput = {
   owner_id: string
   reason: string
+}
+
+export type CreateCaseInput = {
+  customer_id: string
+  case_type: CaseType
+  priority?: CasePriority
+  owner_id?: string
+}
+
+export async function createCase(data: CreateCaseInput): Promise<Case> {
+  return apiRequest<Case>('/cases', { method: 'POST', body: data })
 }
 
 export async function searchCases(params: CaseSearchParams): Promise<PaginatedResponse<Case>> {

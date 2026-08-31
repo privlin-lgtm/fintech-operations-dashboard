@@ -1,12 +1,13 @@
 import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 
-import type { DismissAlertInput, EscalateAlertInput } from '@/features/alerts/alertsApi'
+import type { AssignAlertInput, EscalateAlertInput, ResolveAlertInput } from '@/features/alerts/alertsApi'
 import {
-  dismissAlert,
+  assignAlert,
   escalateAlert,
   fetchAlertDetail,
   parseAlertSearchParams,
+  resolveAlert,
   searchAlerts,
 } from '@/features/alerts/alertsApi'
 import { alertKeys, caseKeys } from '@/lib/queryKeys'
@@ -38,10 +39,18 @@ function useInvalidateAlert(alertId: string) {
   }
 }
 
-export function useDismissAlert(alertId: string) {
+export function useAssignAlert(alertId: string) {
   const invalidate = useInvalidateAlert(alertId)
   return useMutation({
-    mutationFn: (data: DismissAlertInput) => dismissAlert(alertId, data),
+    mutationFn: (data: AssignAlertInput) => assignAlert(alertId, data),
+    onSuccess: invalidate,
+  })
+}
+
+export function useResolveAlert(alertId: string) {
+  const invalidate = useInvalidateAlert(alertId)
+  return useMutation({
+    mutationFn: (data: ResolveAlertInput) => resolveAlert(alertId, data),
     onSuccess: invalidate,
   })
 }

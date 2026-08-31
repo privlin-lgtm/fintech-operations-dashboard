@@ -59,13 +59,18 @@ export function LoginPage() {
         </div>
 
         <Card title="Account access">
-          <form className="space-y-4" onSubmit={(event) => void onSubmit(event)}>
+          <form
+            data-testid="login-form"
+            className="space-y-4"
+            onSubmit={(event) => void onSubmit(event)}
+          >
             <Input
               label="Email"
               type="email"
               autoComplete="email"
               disabled={needsMfaCode}
               required
+              data-testid="login-email"
               {...register('email', { required: true })}
             />
             <Input
@@ -74,6 +79,7 @@ export function LoginPage() {
               autoComplete="current-password"
               disabled={needsMfaCode}
               required
+              data-testid="login-password"
               {...register('password', { required: true })}
             />
 
@@ -106,7 +112,7 @@ export function LoginPage() {
               >
                 Forgot password?
               </Link>
-              <Button type="submit" isLoading={formState.isSubmitting}>
+              <Button type="submit" isLoading={formState.isSubmitting} data-testid="login-submit">
                 {needsMfaCode ? 'Verify and sign in' : 'Sign in'}
               </Button>
             </div>

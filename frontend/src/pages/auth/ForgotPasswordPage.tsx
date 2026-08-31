@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/Input'
 
 export function ForgotPasswordPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-brand-700 px-4">
+    <div className="flex min-h-screen items-center justify-center bg-linear-to-br from-slate-900 via-slate-800 to-brand-700 px-4">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center text-white">
           <h1 className="text-3xl font-semibold">Reset your password</h1>

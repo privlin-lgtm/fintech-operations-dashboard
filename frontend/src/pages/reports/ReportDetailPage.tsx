@@ -132,6 +132,7 @@ export function ReportDetailPage() {
             size="sm"
             isLoading={isDownloading === 'csv'}
             onClick={() => void handleDownload('csv')}
+            data-testid="export-csv"
           >
             Export CSV
           </Button>

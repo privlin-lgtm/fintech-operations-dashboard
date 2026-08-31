@@ -1,10 +1,11 @@
 import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 
-import type { AddCaseNoteInput, CloseCaseInput, ReassignCaseInput } from '@/features/cases/casesApi'
+import type { AddCaseNoteInput, CloseCaseInput, CreateCaseInput, ReassignCaseInput } from '@/features/cases/casesApi'
 import {
   addCaseNote,
   closeCase,
+  createCase,
   fetchCaseDetail,
   parseCaseSearchParams,
   reassignCase,
@@ -43,6 +44,16 @@ function useInvalidateCase(caseId: string) {
 // still be rejected by the backend (e.g. closing without a resolution code),
 // so the UI waits for the real answer instead of showing one that might not
 // have happened.
+
+export function useCreateCase() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: CreateCaseInput) => createCase(data),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: caseKeys.lists() })
+    },
+  })
+}
 
 export function useAddCaseNote(caseId: string) {
   const invalidate = useInvalidateCase(caseId)

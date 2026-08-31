@@ -1,0 +1,107 @@
+import { test, expect } from '@playwright/test'
+
+import { AlertsPage } from '../pages/alerts.page'
+import { CasesPage, CustomerCasePage } from '../pages/cases.page'
+import { CustomersPage } from '../pages/customers.page'
+import { AppShell, LoginPage } from '../pages/login.page'
+import { ReportsPage } from '../pages/reports.page'
+import { TransactionsPage } from '../pages/transactions.page'
+import { seedData } from '../seed-data'
+
+test.describe('Fintech operations desk', () => {
+  test('login', async ({ page }) => {
+    const login = new LoginPage(page)
+    const investigator = seedData.users.investigator
+
+    await login.signIn(investigator.email, seedData.password)
+
+    await expect(page.getByText('Welcome back')).toBeVisible()
+    await expect(page.getByText(investigator.email)).toBeVisible()
+    await expect(page.getByRole('main').getByRole('heading', { name: 'Operations dashboard' })).toBeVisible()
+  })
+
+  test('search customer', async ({ page }) => {
+    const login = new LoginPage(page)
+    const app = new AppShell(page)
+    const customers = new CustomersPage(page)
+
+    await login.signIn(seedData.users.analyst.email, seedData.password)
+    await app.navigateTo('Customers')
+
+    await customers.search('Meridian')
+    await expect(page.getByRole('link', { name: seedData.customers.search.name })).toBeVisible()
+
+    await customers.openCustomer(seedData.customers.search.name)
+    await expect(page.getByRole('heading', { name: seedData.customers.search.name })).toBeVisible()
+    await expect(page.getByText('Risk: High')).toBeVisible()
+  })
+
+  test('view transaction', async ({ page }) => {
+    const login = new LoginPage(page)
+    const app = new AppShell(page)
+    const transactions = new TransactionsPage(page)
+
+    await login.signIn(seedData.users.analyst.email, seedData.password)
+    await app.navigateTo('Transactions')
+
+    await transactions.openTransaction(seedData.transaction.amountLabel)
+    await expect(page.getByRole('heading', { name: seedData.transaction.amountLabel })).toBeVisible()
+    await expect(page.getByText(seedData.transaction.counterparty)).toBeVisible()
+    await expect(page.getByText('**** 8821')).toBeVisible()
+  })
+
+  test('open case', async ({ page }) => {
+    const login = new LoginPage(page)
+    const customerCases = new CustomerCasePage(page)
+
+    await login.signIn(seedData.users.investigator.email, seedData.password)
+    await page.goto(`/customers/${seedData.customers.openCase.id}`)
+
+    await customerCases.openCase('High')
+    await expect(page).toHaveURL(/\/cases\//)
+    await expect(page.getByText('fraud case', { exact: false })).toBeVisible()
+    await expect(page.getByText('High', { exact: true })).toBeVisible()
+  })
+
+  test('assign case', async ({ page }) => {
+    const login = new LoginPage(page)
+    const cases = new CasesPage(page)
+    const analystId = seedData.users.analyst.id
+
+    await login.signIn(seedData.users.team_lead.email, seedData.password)
+    await cases.openCaseById(seedData.caseForAssign.id)
+
+    await expect(page.getByRole('heading', { name: seedData.caseForAssign.caseNumber })).toBeVisible()
+    await cases.reassign(analystId, 'Card fraud specialist coverage for E2E handoff')
+
+    await expect(page.getByText(analystId)).toBeVisible()
+  })
+
+  test('resolve alert', async ({ page }) => {
+    const login = new LoginPage(page)
+    const alerts = new AlertsPage(page)
+
+    await login.signIn(seedData.users.investigator.email, seedData.password)
+    await alerts.openAlertById(seedData.alert.id)
+
+    await expect(page.getByText(seedData.alert.reason)).toBeVisible()
+    await alerts.resolve('False positive — beneficiary cleared against OFAC SDN list')
+
+    await expect(page.getByText('Resolved', { exact: true })).toBeVisible()
+    await expect(page.getByText('False positive — beneficiary cleared against OFAC SDN list')).toBeVisible()
+  })
+
+  test('generate report', async ({ page }) => {
+    const login = new LoginPage(page)
+    const app = new AppShell(page)
+    const reports = new ReportsPage(page)
+
+    await login.signIn(seedData.users.team_lead.email, seedData.password)
+    await app.navigateTo('Reports')
+    await reports.openReport('Transaction volume')
+    await reports.expectResults()
+
+    const download = await reports.exportCsv()
+    expect(download.suggestedFilename()).toMatch(/transactions.*\.csv$/i)
+  })
+})

@@ -128,13 +128,18 @@ function ReassignForm({ caseId }: { caseId: string }) {
   })
 
   return (
-    <form onSubmit={(event) => void onSubmit(event)} className="space-y-3">
+    <form
+      data-testid="reassign-case-form"
+      onSubmit={(event) => void onSubmit(event)}
+      className="space-y-3"
+    >
       <div className="space-y-1.5">
         <label htmlFor="reassign-owner" className="block text-sm font-medium text-slate-700">
           New owner (user ID)
         </label>
         <input
           id="reassign-owner"
+          data-testid="reassign-case-owner"
           className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
           placeholder="Owner UUID"
           {...register('owner_id', { required: 'Choose who this case is going to.' })}
@@ -149,6 +154,7 @@ function ReassignForm({ caseId }: { caseId: string }) {
         </label>
         <input
           id="reassign-reason"
+          data-testid="reassign-case-reason"
           className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
           placeholder="Why is this handing off?"
           {...register('reason', { required: 'A reason is recorded with every reassignment.' })}
@@ -158,7 +164,13 @@ function ReassignForm({ caseId }: { caseId: string }) {
         ) : null}
       </div>
       {mutation.isError ? <p className="text-sm text-red-600">{errorMessage(mutation.error)}</p> : null}
-      <Button type="submit" size="sm" variant="secondary" isLoading={mutation.isPending}>
+      <Button
+        type="submit"
+        size="sm"
+        variant="secondary"
+        isLoading={mutation.isPending}
+        data-testid="reassign-case-submit"
+      >
         Reassign
       </Button>
     </form>

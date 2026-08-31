@@ -46,12 +46,14 @@ export function CustomerSearchForm({ onSubmit }: CustomerSearchFormProps) {
   return (
     <form
       className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:grid-cols-6"
+      data-testid="customer-search-form"
       onSubmit={handleSubmit(onSubmit)}
     >
       <div className="lg:col-span-2">
         <Input
           label="Search"
           placeholder="Name, email, or phone"
+          data-testid="customer-search-query"
           {...register('q')}
         />
       </div>

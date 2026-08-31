@@ -15,7 +15,11 @@ const SEVERITY_VALUES = ALERT_SEVERITY_OPTIONS.map((option) => option.value)
 const TYPE_VALUES = ALERT_TYPE_OPTIONS.map((option) => option.value)
 const SORT_VALUES = ALERT_SORT_OPTIONS.map((option) => option.value)
 
-export type DismissAlertInput = {
+export type AssignAlertInput = {
+  assignee_id: string
+}
+
+export type ResolveAlertInput = {
   reason: string
 }
 
@@ -43,8 +47,12 @@ export async function fetchAlertDetail(alertId: string): Promise<Alert> {
   return apiRequest<Alert>(`/alerts/${alertId}`)
 }
 
-export async function dismissAlert(alertId: string, data: DismissAlertInput): Promise<Alert> {
-  return apiRequest<Alert>(`/alerts/${alertId}/dismiss`, { method: 'POST', body: data })
+export async function assignAlert(alertId: string, data: AssignAlertInput): Promise<Alert> {
+  return apiRequest<Alert>(`/alerts/${alertId}/assign`, { method: 'POST', body: data })
+}
+
+export async function resolveAlert(alertId: string, data: ResolveAlertInput): Promise<Alert> {
+  return apiRequest<Alert>(`/alerts/${alertId}/resolve`, { method: 'POST', body: data })
 }
 
 export async function escalateAlert(alertId: string, data: EscalateAlertInput): Promise<Alert> {
