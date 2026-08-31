@@ -7,12 +7,24 @@ from uuid import uuid4
 import pytest
 
 from app.core.case_permissions import can_close_case, can_reassign_case, can_view_case
-from app.core.exceptions import AuthorizationError, ConflictError, NotFoundError, ValidationConflictError
+from app.core.exceptions import (
+    AuthorizationError,
+    ConflictError,
+    NotFoundError,
+    ValidationConflictError,
+)
 from app.models.case import Case
 from app.models.enums import CasePriority, CaseStatus, CaseType
 from app.models.role import Role
 from app.models.user import User
-from app.schemas.case import CaseAssign, CaseClose, CaseCreate, CaseNoteCreate, CaseReassign, CaseUpdate
+from app.schemas.case import (
+    CaseAssign,
+    CaseClose,
+    CaseCreate,
+    CaseNoteCreate,
+    CaseReassign,
+    CaseUpdate,
+)
 from app.services.case import CaseService
 
 
@@ -89,7 +101,7 @@ def test_only_team_lead_can_reassign():
 
 @pytest.mark.asyncio
 async def test_create_case_validates_customer():
-    svc, repo, audit = _service()
+    svc, repo, _audit = _service()
     svc.customer_repo.get_active_by_id.return_value = None
     actor = _user()
 

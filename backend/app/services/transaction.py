@@ -6,7 +6,11 @@ from app.core.sorting import decode_sort_cursor, paginate_sorted
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.repositories.audit_log import AuditLogRepository
-from app.repositories.transaction import TRANSACTION_SORT_COLUMNS, TransactionRepository, parse_transaction_sort
+from app.repositories.transaction import (
+    TRANSACTION_SORT_COLUMNS,
+    TransactionRepository,
+    parse_transaction_sort,
+)
 from app.schemas.base import PaginatedResponse
 from app.schemas.transaction import (
     TransactionAccountSummary,
@@ -28,10 +32,9 @@ def build_status_history(txn: Transaction) -> list[TransactionStatusEvent]:
             )
         )
 
-    if txn.settled_at and txn.status == "settled":
-        # Avoid duplicate if the block above already used settled_at.
-        if not events or events[-1].status != "settled":
-            events.append(TransactionStatusEvent(status="settled", occurred_at=txn.settled_at))
+    # Avoid duplicate if the block above already used settled_at.
+    if txn.settled_at and txn.status == "settled" and (not events or events[-1].status != "settled"):
+        events.append(TransactionStatusEvent(status="settled", occurred_at=txn.settled_at))
 
     return events
 

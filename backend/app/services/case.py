@@ -14,6 +14,7 @@ from app.core.case_permissions import (
 )
 from app.core.exceptions import ConflictError, NotFoundError, ValidationConflictError
 from app.core.pagination import Cursor, decode_cursor, paginate
+from app.core.sla import SLA_HOURS
 from app.models.case import Case, CaseNote, CaseTransactionLink
 from app.models.user import User
 from app.repositories.audit_log import AuditLogRepository
@@ -39,8 +40,6 @@ VALID_TRANSITIONS: dict[str, set[str]] = {
     "pending_external": {"in_progress", "closed_resolved", "closed_no_action"},
     "escalated": {"in_progress", "closed_resolved", "closed_no_action"},
 }
-
-from app.core.sla import SLA_HOURS
 
 
 class CaseService:

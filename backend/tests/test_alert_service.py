@@ -8,13 +8,17 @@ import pytest
 
 from app.core.alert_permissions import (
     can_assign_alert,
-    can_resolve_alert,
     can_view_alert,
     validate_transition,
 )
-from app.core.exceptions import AuthorizationError, ConflictError, NotFoundError, ValidationConflictError
+from app.core.exceptions import (
+    AuthorizationError,
+    ConflictError,
+    NotFoundError,
+    ValidationConflictError,
+)
 from app.models.alert import Alert
-from app.models.enums import AlertSeverity, AlertStatus, AlertType
+from app.models.enums import AlertSeverity, AlertType
 from app.models.role import Role
 from app.models.user import User
 from app.schemas.alert import AlertAssign, AlertCreate, AlertResolve
@@ -130,7 +134,7 @@ async def test_assign_transitions_to_assigned():
 
 @pytest.mark.asyncio
 async def test_resolve_sets_terminal_state():
-    svc, repo, audit, _customer_repo, _user_repo = _service()
+    svc, repo, _audit, _customer_repo, _user_repo = _service()
     investigator = _user(role_name="investigator")
     alert = _alert(status="assigned", assignee_id=investigator.id)
     repo.get_active_by_id.return_value = alert

@@ -53,6 +53,10 @@ target-version = "py311"
 # mutable defaults, which are safe (unlike the dataclass/stdlib case the rule
 # is written for).
 ignore = ["B008", "RUF012"]
+# E402 (module-level import not at top of file) isn't in ruff's default rule
+# set for this version — added explicitly after it missed a real mid-file
+# import in services/case.py.
+extend-select = ["E402"]
 
 [tool.pyright]
 venvPath = "."

@@ -64,9 +64,7 @@ def can_modify_alert(user: User, alert: Alert) -> bool:
     role = user.role.name
     if role in ("team_lead", "admin"):
         return True
-    if role == "investigator":
-        return True
-    return False
+    return role == "investigator"
 
 
 def can_assign_alert(user: User, alert: Alert) -> bool:

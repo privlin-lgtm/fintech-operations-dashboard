@@ -2,7 +2,6 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from app.core.alert_permissions import (
-    OPEN_ALERT_STATUSES,
     enforce_assign,
     enforce_delete,
     enforce_escalate,

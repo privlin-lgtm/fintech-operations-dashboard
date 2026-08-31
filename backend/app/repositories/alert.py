@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import Text, and_, func, or_, select
+from sqlalchemy import Text, and_, func, or_
 from sqlalchemy.sql import ColumnElement
 
 from app.core.sorting import SortCursor, SortSpec, parse_sort

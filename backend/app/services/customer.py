@@ -1,6 +1,9 @@
+from collections.abc import Awaitable, Callable
 from enum import Enum
+from typing import TypeVar
 from uuid import UUID
 
+from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 
 from app.core.alert_permissions import OPEN_ALERT_STATUSES
@@ -31,6 +34,8 @@ from app.services.alert import AlertService
 from app.services.case import CaseService
 
 RECENT_PREVIEW_LIMIT = 5
+
+SchemaT = TypeVar("SchemaT", bound=BaseModel)
 
 
 class CustomerService:
@@ -222,43 +227,62 @@ class CustomerService:
     async def list_accounts(
         self, customer_id: UUID, *, viewer: User, limit: int = 25, cursor: str | None = None
     ) -> PaginatedResponse[AccountRead]:
-        parsed_cursor = decode_cursor(cursor) if cursor else None
-        rows = await self.account_repo.list_by_customer(customer_id, cursor=parsed_cursor, limit=limit)
-        await self._ensure_exists_if_empty(customer_id, rows)
-        items, next_cursor = paginate(rows, limit)
-        await self.audit_repo.record(
-            actor_id=viewer.id, action="view", resource_type="customer_accounts", resource_id=customer_id
-        )
-        return PaginatedResponse(
-            items=[AccountRead.model_validate(a) for a in items], next_cursor=next_cursor, limit=limit
+        return await self._list_related(
+            customer_id,
+            viewer=viewer,
+            limit=limit,
+            cursor=cursor,
+            fetch=self.account_repo.list_by_customer,
+            schema=AccountRead,
+            resource_type="customer_accounts",
         )
 
     async def list_cases(
         self, customer_id: UUID, *, viewer: User, limit: int = 25, cursor: str | None = None
     ) -> PaginatedResponse[CaseRead]:
-        parsed_cursor = decode_cursor(cursor) if cursor else None
-        rows = await self.case_service.list_for_customer(customer_id, cursor=parsed_cursor, limit=limit)
-        await self._ensure_exists_if_empty(customer_id, rows)
-        items, next_cursor = paginate(rows, limit)
-        await self.audit_repo.record(
-            actor_id=viewer.id, action="view", resource_type="customer_cases", resource_id=customer_id
-        )
-        return PaginatedResponse(
-            items=[CaseRead.model_validate(c) for c in items], next_cursor=next_cursor, limit=limit
+        return await self._list_related(
+            customer_id,
+            viewer=viewer,
+            limit=limit,
+            cursor=cursor,
+            fetch=self.case_service.list_for_customer,
+            schema=CaseRead,
+            resource_type="customer_cases",
         )
 
     async def list_alerts(
         self, customer_id: UUID, *, viewer: User, limit: int = 25, cursor: str | None = None
     ) -> PaginatedResponse[AlertRead]:
+        return await self._list_related(
+            customer_id,
+            viewer=viewer,
+            limit=limit,
+            cursor=cursor,
+            fetch=self.alert_service.list_for_customer,
+            schema=AlertRead,
+            resource_type="customer_alerts",
+        )
+
+    async def _list_related(
+        self,
+        customer_id: UUID,
+        *,
+        viewer: User,
+        limit: int,
+        cursor: str | None,
+        fetch: Callable[..., Awaitable[list]],
+        schema: type[SchemaT],
+        resource_type: str,
+    ) -> PaginatedResponse[SchemaT]:
         parsed_cursor = decode_cursor(cursor) if cursor else None
-        rows = await self.alert_service.list_for_customer(customer_id, cursor=parsed_cursor, limit=limit)
+        rows = await fetch(customer_id, cursor=parsed_cursor, limit=limit)
         await self._ensure_exists_if_empty(customer_id, rows)
         items, next_cursor = paginate(rows, limit)
         await self.audit_repo.record(
-            actor_id=viewer.id, action="view", resource_type="customer_alerts", resource_id=customer_id
+            actor_id=viewer.id, action="view", resource_type=resource_type, resource_id=customer_id
         )
         return PaginatedResponse(
-            items=[AlertRead.model_validate(a) for a in items], next_cursor=next_cursor, limit=limit
+            items=[schema.model_validate(item) for item in items], next_cursor=next_cursor, limit=limit
         )
 
     async def _get_or_404(self, customer_id: UUID) -> Customer:
