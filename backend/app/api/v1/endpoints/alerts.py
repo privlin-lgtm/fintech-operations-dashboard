@@ -1,25 +1,24 @@
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Query
 
-from app.core.dependencies import get_alert_service, get_current_user
-from app.models.user import User
+from app.core.dependencies import AlertServiceDep, CurrentUserDep
 from app.schemas.alert import AlertDismiss, AlertEscalate, AlertRead
 from app.schemas.base import PaginatedResponse
-from app.services.alert import AlertService
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
 
 @router.get("", response_model=PaginatedResponse[AlertRead])
 async def list_alerts(
-    severity: str | None = Query(default=None),
-    status_filter: str | None = Query(default=None, alias="status"),
-    alert_type: str | None = Query(default=None, alias="type"),
-    limit: int = Query(default=25, ge=1, le=200),
-    cursor: str | None = Query(default=None),
-    _user: User = Depends(get_current_user),
-    service: AlertService = Depends(get_alert_service),
+    _user: CurrentUserDep,
+    service: AlertServiceDep,
+    severity: Annotated[str | None, Query()] = None,
+    status_filter: Annotated[str | None, Query(alias="status")] = None,
+    alert_type: Annotated[str | None, Query(alias="type")] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 25,
+    cursor: Annotated[str | None, Query()] = None,
 ) -> PaginatedResponse[AlertRead]:
     return await service.list_alerts(
         severity=severity,
@@ -31,29 +30,19 @@ async def list_alerts(
 
 
 @router.get("/{alert_id}", response_model=AlertRead)
-async def get_alert(
-    alert_id: UUID,
-    _user: User = Depends(get_current_user),
-    service: AlertService = Depends(get_alert_service),
-) -> AlertRead:
+async def get_alert(alert_id: UUID, _user: CurrentUserDep, service: AlertServiceDep) -> AlertRead:
     return await service.get_by_id(alert_id)
 
 
 @router.post("/{alert_id}/dismiss", response_model=AlertRead)
 async def dismiss_alert(
-    alert_id: UUID,
-    data: AlertDismiss,
-    current_user: User = Depends(get_current_user),
-    service: AlertService = Depends(get_alert_service),
+    alert_id: UUID, data: AlertDismiss, current_user: CurrentUserDep, service: AlertServiceDep
 ) -> AlertRead:
     return await service.dismiss(alert_id, data, current_user)
 
 
 @router.post("/{alert_id}/escalate", response_model=AlertRead)
 async def escalate_alert(
-    alert_id: UUID,
-    data: AlertEscalate,
-    current_user: User = Depends(get_current_user),
-    service: AlertService = Depends(get_alert_service),
+    alert_id: UUID, data: AlertEscalate, current_user: CurrentUserDep, service: AlertServiceDep
 ) -> AlertRead:
     return await service.escalate(alert_id, data, current_user)

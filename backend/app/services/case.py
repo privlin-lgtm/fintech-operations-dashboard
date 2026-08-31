@@ -1,12 +1,11 @@
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.core.exceptions import ConflictError, NotFoundError, ValidationConflictError
 from app.core.pagination import Cursor, decode_cursor, paginate
 from app.models.case import Case, CaseNote, CaseTransactionLink
 from app.models.user import User
+from app.repositories.audit_log import AuditLogRepository
 from app.repositories.case import CaseRepository
 from app.schemas.base import PaginatedResponse
 from app.schemas.case import (
@@ -31,8 +30,9 @@ SLA_HOURS = {"low": 120, "medium": 72, "high": 24, "critical": 4}
 
 
 class CaseService:
-    def __init__(self, session: AsyncSession) -> None:
-        self.repo = CaseRepository(session)
+    def __init__(self, case_repo: CaseRepository, audit_repo: AuditLogRepository) -> None:
+        self.repo = case_repo
+        self.audit_repo = audit_repo
 
     async def create(self, data: CaseCreate, actor: User) -> CaseRead:
         case_number = await self.repo.next_case_number()
@@ -53,6 +53,9 @@ class CaseService:
                 body=f"Case created by {actor.full_name}",
                 is_system=True,
             )
+        )
+        await self.audit_repo.record(
+            actor_id=actor.id, action="create", resource_type="case", resource_id=created.id
         )
         return CaseRead.model_validate(created)
 
@@ -118,12 +121,22 @@ class CaseService:
             case.owner_id = data.owner_id
         await self.repo.session.flush()
         await self.repo.session.refresh(case)
+        await self.audit_repo.record(
+            actor_id=actor.id,
+            action="update",
+            resource_type="case",
+            resource_id=case.id,
+            metadata=data.model_dump(exclude_unset=True, mode="json"),
+        )
         return CaseRead.model_validate(case)
 
     async def add_note(self, case_id: UUID, data: CaseNoteCreate, actor: User) -> CaseDetail:
         case = await self._get_or_404(case_id)
         await self.repo.add_note(
             CaseNote(case_id=case.id, author_id=actor.id, body=data.body)
+        )
+        await self.audit_repo.record(
+            actor_id=actor.id, action="add_note", resource_type="case", resource_id=case.id
         )
         return await self.get_detail(case_id)
 
@@ -140,6 +153,13 @@ class CaseService:
         )
         await self.repo.session.flush()
         await self.repo.session.refresh(case)
+        await self.audit_repo.record(
+            actor_id=actor.id,
+            action="reassign",
+            resource_type="case",
+            resource_id=case.id,
+            metadata={"new_owner_id": str(data.owner_id), "reason": data.reason},
+        )
         return CaseRead.model_validate(case)
 
     async def close(self, case_id: UUID, data: CaseClose, actor: User) -> CaseRead:
@@ -160,6 +180,13 @@ class CaseService:
         )
         await self.repo.session.flush()
         await self.repo.session.refresh(case)
+        await self.audit_repo.record(
+            actor_id=actor.id,
+            action="close",
+            resource_type="case",
+            resource_id=case.id,
+            metadata={"resolution_code": data.resolution_code},
+        )
         return CaseRead.model_validate(case)
 
     async def link(self, case_id: UUID, data: CaseLinkCreate, actor: User) -> CaseDetail:
@@ -172,6 +199,20 @@ class CaseService:
                     linked_by=actor.id,
                 )
             )
+        if data.alert_id:
+            linked = await self.repo.link_alert(case.id, data.alert_id)
+            if linked is None:
+                raise NotFoundError("alert", data.alert_id)
+        await self.audit_repo.record(
+            actor_id=actor.id,
+            action="link",
+            resource_type="case",
+            resource_id=case.id,
+            metadata={
+                "transaction_id": str(data.transaction_id) if data.transaction_id else None,
+                "alert_id": str(data.alert_id) if data.alert_id else None,
+            },
+        )
         return await self.get_detail(case_id)
 
     async def _get_or_404(self, case_id: UUID) -> Case:

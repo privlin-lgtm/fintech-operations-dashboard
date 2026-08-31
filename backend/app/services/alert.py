@@ -1,23 +1,28 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.core.exceptions import ConflictError, NotFoundError, ValidationConflictError
 from app.core.pagination import Cursor, decode_cursor, paginate
 from app.models.alert import Alert
 from app.models.case import Case, CaseNote
 from app.models.user import User
 from app.repositories.alert import AlertRepository
+from app.repositories.audit_log import AuditLogRepository
 from app.repositories.case import CaseRepository
 from app.schemas.alert import AlertDismiss, AlertEscalate, AlertRead
 from app.schemas.base import PaginatedResponse
 
 
 class AlertService:
-    def __init__(self, session: AsyncSession) -> None:
-        self.repo = AlertRepository(session)
-        self.case_repo = CaseRepository(session)
+    def __init__(
+        self,
+        alert_repo: AlertRepository,
+        case_repo: CaseRepository,
+        audit_repo: AuditLogRepository,
+    ) -> None:
+        self.repo = alert_repo
+        self.case_repo = case_repo
+        self.audit_repo = audit_repo
 
     async def get_by_id(self, alert_id: UUID) -> AlertRead:
         alert = await self._get_or_404(alert_id)
@@ -63,6 +68,13 @@ class AlertService:
         alert.resolved_at = datetime.now(UTC)
         await self.repo.session.flush()
         await self.repo.session.refresh(alert)
+        await self.audit_repo.record(
+            actor_id=actor.id,
+            action="dismiss",
+            resource_type="alert",
+            resource_id=alert.id,
+            metadata={"reason": data.reason},
+        )
         return AlertRead.model_validate(alert)
 
     async def escalate(
@@ -101,6 +113,13 @@ class AlertService:
         alert.resolved_at = datetime.now(UTC)
         await self.repo.session.flush()
         await self.repo.session.refresh(alert)
+        await self.audit_repo.record(
+            actor_id=actor.id,
+            action="escalate",
+            resource_type="alert",
+            resource_id=alert.id,
+            metadata={"case_id": str(case_id)},
+        )
         return AlertRead.model_validate(alert)
 
     async def _get_or_404(self, alert_id: UUID) -> Alert:

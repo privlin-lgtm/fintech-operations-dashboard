@@ -1,19 +1,23 @@
 from datetime import datetime
-from uuid import UUID
-
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.report import Report
 from app.models.user import User
 from app.repositories.alert import AlertRepository
+from app.repositories.audit_log import AuditLogRepository
 from app.repositories.report import ReportRepository
 from app.schemas.report import DashboardSummary, ReportRead, ReportScheduleCreate
 
 
 class ReportService:
-    def __init__(self, session: AsyncSession) -> None:
-        self.repo = ReportRepository(session)
-        self.alert_repo = AlertRepository(session)
+    def __init__(
+        self,
+        report_repo: ReportRepository,
+        alert_repo: AlertRepository,
+        audit_repo: AuditLogRepository,
+    ) -> None:
+        self.repo = report_repo
+        self.alert_repo = alert_repo
+        self.audit_repo = audit_repo
 
     async def dashboard(self) -> DashboardSummary:
         return DashboardSummary(
@@ -45,4 +49,10 @@ class ReportService:
             created_by=actor.id,
         )
         created = await self.repo.add_schedule(report)
+        await self.audit_repo.record(
+            actor_id=actor.id,
+            action="create",
+            resource_type="report_schedule",
+            resource_id=created.id,
+        )
         return ReportRead.model_validate(created)

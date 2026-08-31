@@ -1,11 +1,11 @@
 import asyncio
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+from alembic import context
 from app.core.config import get_settings
 from app.db.base import Base
 from app.models import Role, User  # noqa: F401 — register models with metadata
@@ -14,6 +14,7 @@ from app.models.alert import Alert  # noqa: F401
 from app.models.audit_log import AuditLog  # noqa: F401
 from app.models.case import Case, CaseNote, CaseTransactionLink  # noqa: F401
 from app.models.customer import Customer  # noqa: F401
+from app.models.refresh_token import RefreshToken  # noqa: F401
 from app.models.report import Report  # noqa: F401
 from app.models.transaction import Transaction  # noqa: F401
 

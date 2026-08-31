@@ -1,8 +1,6 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.core.exceptions import NotFoundError
 from app.core.pagination import decode_cursor, paginate
 from app.repositories.transaction import TransactionRepository
@@ -11,8 +9,8 @@ from app.schemas.transaction import TransactionRead
 
 
 class TransactionService:
-    def __init__(self, session: AsyncSession) -> None:
-        self.repo = TransactionRepository(session)
+    def __init__(self, transaction_repo: TransactionRepository) -> None:
+        self.repo = transaction_repo
 
     async def get_by_id(self, transaction_id: UUID) -> TransactionRead:
         txn = await self.repo.get_detail(transaction_id)

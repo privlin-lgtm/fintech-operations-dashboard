@@ -1,9 +1,11 @@
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import AuthenticationError, AuthorizationError
 from app.core.security import verify_token
 from app.db.session import get_db_session
 from app.models.user import User
@@ -12,6 +14,9 @@ from app.repositories.alert import AlertRepository
 from app.repositories.audit_log import AuditLogRepository
 from app.repositories.case import CaseRepository
 from app.repositories.customer import CustomerRepository
+from app.repositories.refresh_token import RefreshTokenRepository
+from app.repositories.report import ReportRepository
+from app.repositories.transaction import TransactionRepository
 from app.repositories.user import UserRepository
 from app.services.alert import AlertService
 from app.services.auth import AuthService
@@ -23,102 +28,166 @@ from app.services.transaction import TransactionService
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
-async def get_session(
-    session: AsyncSession = Depends(get_db_session),
-) -> AsyncSession:
+async def get_session(session: Annotated[AsyncSession, Depends(get_db_session)]) -> AsyncSession:
     return session
 
 
-def get_auth_service(
-    session: AsyncSession = Depends(get_session),
-) -> AuthService:
-    return AuthService(session)
+SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
-def get_user_repository(
-    session: AsyncSession = Depends(get_session),
-) -> UserRepository:
+# ---------------------------------------------------------------------------
+# Repositories — one factory per repo, all sharing the request's single
+# AsyncSession via FastAPI's per-request dependency cache.
+# ---------------------------------------------------------------------------
+
+
+def get_user_repository(session: SessionDep) -> UserRepository:
     return UserRepository(session)
 
 
-def get_transaction_service(
-    session: AsyncSession = Depends(get_session),
-) -> TransactionService:
-    return TransactionService(session)
+def get_refresh_token_repository(session: SessionDep) -> RefreshTokenRepository:
+    return RefreshTokenRepository(session)
 
 
-def get_case_service(
-    session: AsyncSession = Depends(get_session),
-) -> CaseService:
-    return CaseService(session)
+def get_audit_log_repository(session: SessionDep) -> AuditLogRepository:
+    return AuditLogRepository(session)
+
+
+def get_customer_repository(session: SessionDep) -> CustomerRepository:
+    return CustomerRepository(session)
+
+
+def get_account_repository(session: SessionDep) -> AccountRepository:
+    return AccountRepository(session)
+
+
+def get_case_repository(session: SessionDep) -> CaseRepository:
+    return CaseRepository(session)
+
+
+def get_alert_repository(session: SessionDep) -> AlertRepository:
+    return AlertRepository(session)
+
+
+def get_transaction_repository(session: SessionDep) -> TransactionRepository:
+    return TransactionRepository(session)
+
+
+def get_report_repository(session: SessionDep) -> ReportRepository:
+    return ReportRepository(session)
+
+
+UserRepoDep = Annotated[UserRepository, Depends(get_user_repository)]
+RefreshTokenRepoDep = Annotated[RefreshTokenRepository, Depends(get_refresh_token_repository)]
+AuditLogRepoDep = Annotated[AuditLogRepository, Depends(get_audit_log_repository)]
+CustomerRepoDep = Annotated[CustomerRepository, Depends(get_customer_repository)]
+AccountRepoDep = Annotated[AccountRepository, Depends(get_account_repository)]
+CaseRepoDep = Annotated[CaseRepository, Depends(get_case_repository)]
+AlertRepoDep = Annotated[AlertRepository, Depends(get_alert_repository)]
+TransactionRepoDep = Annotated[TransactionRepository, Depends(get_transaction_repository)]
+ReportRepoDep = Annotated[ReportRepository, Depends(get_report_repository)]
+
+
+# ---------------------------------------------------------------------------
+# Services — each takes its collaborators via constructor injection rather
+# than building them from a raw session, so a service can be unit-tested
+# with fake repositories instead of a real database.
+# ---------------------------------------------------------------------------
+
+
+def get_auth_service(
+    user_repo: UserRepoDep,
+    refresh_token_repo: RefreshTokenRepoDep,
+    audit_repo: AuditLogRepoDep,
+) -> AuthService:
+    return AuthService(user_repo, refresh_token_repo, audit_repo)
+
+
+def get_transaction_service(transaction_repo: TransactionRepoDep) -> TransactionService:
+    return TransactionService(transaction_repo)
+
+
+def get_case_service(case_repo: CaseRepoDep, audit_repo: AuditLogRepoDep) -> CaseService:
+    return CaseService(case_repo, audit_repo)
 
 
 def get_alert_service(
-    session: AsyncSession = Depends(get_session),
+    alert_repo: AlertRepoDep, case_repo: CaseRepoDep, audit_repo: AuditLogRepoDep
 ) -> AlertService:
-    return AlertService(session)
+    return AlertService(alert_repo, case_repo, audit_repo)
+
+
+def get_report_service(
+    report_repo: ReportRepoDep, alert_repo: AlertRepoDep, audit_repo: AuditLogRepoDep
+) -> ReportService:
+    return ReportService(report_repo, alert_repo, audit_repo)
 
 
 def get_customer_service(
-    session: AsyncSession = Depends(get_session),
-    case_service: CaseService = Depends(get_case_service),
-    alert_service: AlertService = Depends(get_alert_service),
+    customer_repo: CustomerRepoDep,
+    account_repo: AccountRepoDep,
+    case_repo: CaseRepoDep,
+    alert_repo: AlertRepoDep,
+    audit_repo: AuditLogRepoDep,
+    case_service: Annotated[CaseService, Depends(get_case_service)],
+    alert_service: Annotated[AlertService, Depends(get_alert_service)],
 ) -> CustomerService:
     return CustomerService(
-        customer_repo=CustomerRepository(session),
-        account_repo=AccountRepository(session),
-        case_repo=CaseRepository(session),
-        alert_repo=AlertRepository(session),
-        audit_repo=AuditLogRepository(session),
+        customer_repo=customer_repo,
+        account_repo=account_repo,
+        case_repo=case_repo,
+        alert_repo=alert_repo,
+        audit_repo=audit_repo,
         case_service=case_service,
         alert_service=alert_service,
     )
 
 
-def get_report_service(
-    session: AsyncSession = Depends(get_session),
-) -> ReportService:
-    return ReportService(session)
+AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
+TransactionServiceDep = Annotated[TransactionService, Depends(get_transaction_service)]
+CaseServiceDep = Annotated[CaseService, Depends(get_case_service)]
+AlertServiceDep = Annotated[AlertService, Depends(get_alert_service)]
+ReportServiceDep = Annotated[ReportService, Depends(get_report_service)]
+CustomerServiceDep = Annotated[CustomerService, Depends(get_customer_service)]
+
+
+# ---------------------------------------------------------------------------
+# Auth
+# ---------------------------------------------------------------------------
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-    user_repo: UserRepository = Depends(get_user_repository),
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
+    user_repo: UserRepoDep,
 ) -> User:
     if credentials is None or credentials.scheme.lower() != "bearer":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise AuthenticationError("Not authenticated")
 
     try:
         payload = verify_token(credentials.credentials, expected_type="access")
         user_id = UUID(payload["sub"])
     except (ValueError, KeyError) as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-            headers={"WWW-Authenticate": "Bearer"},
-        ) from exc
+        raise AuthenticationError("Invalid or expired token") from exc
 
     user = await user_repo.get_active_by_id(user_id)
     if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found or inactive",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise AuthenticationError("User not found or inactive")
+
+    # Bumped on logout — a token minted before that point stops working on
+    # the very next request instead of riding out its remaining lifetime.
+    if payload.get("tv") != user.token_version:
+        raise AuthenticationError("Session has been invalidated, please log in again")
+
     return user
 
 
+CurrentUserDep = Annotated[User, Depends(get_current_user)]
+
+
 def require_roles(*allowed_roles: str):
-    async def _checker(current_user: User = Depends(get_current_user)) -> User:
+    async def _checker(current_user: CurrentUserDep) -> User:
         if current_user.role.name not in allowed_roles:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Insufficient permissions",
-            )
+            raise AuthorizationError("Insufficient permissions")
         return current_user
 
     return _checker

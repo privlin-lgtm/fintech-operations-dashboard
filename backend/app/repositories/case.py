@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from app.core.pagination import Cursor
+from app.models.alert import Alert
 from app.models.case import Case, CaseNote, CaseTransactionLink
 from app.repositories.base import BaseRepository
 
@@ -82,3 +83,14 @@ class CaseRepository(BaseRepository[Case]):
         self.session.add(link)
         await self.session.flush()
         return link
+
+    async def link_alert(self, case_id: UUID, alert_id: UUID) -> Alert | None:
+        result = await self.session.execute(
+            select(Alert).where(Alert.id == alert_id, Alert.deleted_at.is_(None))
+        )
+        alert = result.scalar_one_or_none()
+        if alert is None:
+            return None
+        alert.case_id = case_id
+        await self.session.flush()
+        return alert

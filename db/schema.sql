@@ -3,7 +3,7 @@
 -- PostgreSQL 14+
 --
 -- Entities: roles, users, customers, accounts, transactions, cases,
---           case_notes, alerts, reports
+--           case_notes, alerts, reports, audit_logs, refresh_tokens
 --
 -- Design decisions are explained in the accompanying chat response, not
 -- repeated here as comments — this file is meant to run as-is (or as the
@@ -53,6 +53,8 @@ create table users (
     full_name        text not null,
     hashed_password  text not null,
     mfa_enabled      boolean not null default false,
+    mfa_secret       text,   -- base32 TOTP secret; null until the user enrolls
+    token_version    bigint not null default 0,   -- bumped to invalidate outstanding access tokens
     status           text not null default 'active'
                          check (status in ('active', 'deactivated')),
     last_login_at    timestamptz,
@@ -307,3 +309,24 @@ create table audit_logs (
 create index ix_audit_logs_resource   on audit_logs (resource_type, resource_id);
 create index ix_audit_logs_actor_id   on audit_logs (actor_id);
 create index ix_audit_logs_created_at on audit_logs (created_at);
+
+
+-- ============================================================================
+-- 11. refresh_tokens  (server-side revocation for the JWT refresh flow)
+-- ============================================================================
+create table refresh_tokens (
+    id           uuid primary key default gen_random_uuid(),
+    user_id      uuid not null references users(id) on delete cascade,
+    token_hash   text not null unique,   -- sha256 of the token; the raw value is never stored
+    expires_at   timestamptz not null,
+    revoked_at   timestamptz,
+    device_info  text,
+    created_at   timestamptz not null default now(),
+    updated_at   timestamptz not null default now()
+);
+
+create index ix_refresh_tokens_user_id on refresh_tokens (user_id);
+
+create trigger trg_refresh_tokens_updated_at
+before update on refresh_tokens
+for each row execute function set_updated_at();

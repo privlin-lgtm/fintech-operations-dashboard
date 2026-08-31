@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Text
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import CITEXT
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -25,6 +25,11 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     full_name: Mapped[str] = mapped_column(Text, nullable=False)
     hashed_password: Mapped[str] = mapped_column(Text, nullable=False)
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    mfa_secret: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Bumped on logout/deactivation; embedded in every access token as "tv" so
+    # a previously-issued token can be invalidated on the next request instead
+    # of waiting out its remaining lifetime (up to jwt_access_token_expire_minutes).
+    token_version: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0, server_default="0")
     status: Mapped[str] = mapped_column(
         Text,
         nullable=False,

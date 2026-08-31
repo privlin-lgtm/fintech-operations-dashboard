@@ -14,7 +14,11 @@ dependencies = [
     "pydantic-settings>=2.6.0",
     "python-jose[cryptography]>=3.3.0",
     "passlib[bcrypt]>=1.7.4",
+    # passlib's bcrypt backend detection reads bcrypt.__about__, which bcrypt
+    # removed in 4.1 — pin below that until passlib ships a fix.
+    "bcrypt<4.1",
     "python-multipart>=0.0.18",
+    "pyotp>=2.9.0",
 ]
 
 [project.optional-dependencies]
@@ -39,3 +43,10 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+
+[tool.ruff.lint]
+# B008 flags FastAPI's Depends()-in-default idiom, which is the framework's
+# documented pattern, not a bug. RUF012 flags Pydantic's per-instance-copied
+# mutable defaults, which are safe (unlike the dataclass/stdlib case the rule
+# is written for).
+ignore = ["B008", "RUF012"]

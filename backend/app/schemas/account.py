@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from app.schemas.base import ORMModel, TimestampSchema, UUIDSchema
+from app.schemas.base import TimestampSchema, UUIDSchema
 
 
 class AccountRead(UUIDSchema, TimestampSchema):

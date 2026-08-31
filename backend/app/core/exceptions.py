@@ -31,3 +31,19 @@ class InvalidCursorError(DomainError):
     def __init__(self, cursor: str) -> None:
         self.cursor = cursor
         super().__init__(f"Invalid pagination cursor: {cursor!r}")
+
+
+class AuthenticationError(DomainError):
+    """Missing, invalid, expired, or revoked credentials — always a 401."""
+
+    def __init__(self, message: str = "Not authenticated") -> None:
+        self.message = message
+        super().__init__(message)
+
+
+class AuthorizationError(DomainError):
+    """Authenticated, but not allowed to do this — always a 403."""
+
+    def __init__(self, message: str = "Insufficient permissions") -> None:
+        self.message = message
+        super().__init__(message)

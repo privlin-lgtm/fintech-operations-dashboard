@@ -4,6 +4,7 @@ from pydantic import BaseModel, EmailStr, Field
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)
+    mfa_code: str | None = Field(default=None, min_length=6, max_length=6)
 
 
 class TokenResponse(BaseModel):
@@ -16,8 +17,13 @@ class RefreshTokenRequest(BaseModel):
     refresh_token: str
 
 
+class LogoutRequest(BaseModel):
+    refresh_token: str
+
+
 class TokenPayload(BaseModel):
     sub: str
     type: str
     role: str | None = None
-    permissions: dict | None = None
+    tv: int | None = None
+    jti: str | None = None

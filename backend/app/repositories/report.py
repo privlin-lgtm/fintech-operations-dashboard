@@ -1,11 +1,19 @@
 from datetime import UTC, datetime
-from uuid import UUID
 
 from sqlalchemy import func, select
 
 from app.models.case import Case
 from app.models.report import Report
 from app.repositories.base import BaseRepository
+
+# Explicit allow-list — `getattr(Case, group_by)` on an unconstrained string
+# would let a caller aggregate by any mapped column, including ones never
+# meant to be a report dimension (owner_id, closing_summary, ...).
+CASE_GROUP_BY_COLUMNS: dict[str, object] = {
+    "status": Case.status,
+    "priority": Case.priority,
+    "case_type": Case.case_type,
+}
 
 
 class ReportRepository(BaseRepository[Report]):
@@ -53,7 +61,7 @@ class ReportRepository(BaseRepository[Report]):
         to_date: datetime | None,
         group_by: str,
     ) -> list[dict]:
-        column = getattr(Case, group_by, Case.status)
+        column = CASE_GROUP_BY_COLUMNS.get(group_by, Case.status)
         stmt = (
             select(column, func.count())
             .where(Case.deleted_at.is_(None))

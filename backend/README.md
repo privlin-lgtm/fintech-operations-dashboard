@@ -57,14 +57,36 @@ API docs: http://localhost:8000/docs
 | Transactions | `/api/v1/transactions` | get, search |
 | Cases | `/api/v1/cases` | CRUD, notes, links, reassign, close |
 | Alerts | `/api/v1/alerts` | queue, dismiss, escalate |
-| Reports | `/api/v1/reports` | dashboard, case volume |
-| Schedules | `/api/v1/report-schedules` | create schedule |
+| Reports | `/api/v1/reports` | dashboard, case volume, schedules |
 
 Run migrations for all tables:
 
 ```bash
 alembic upgrade head
 ```
+
+## Testing
+
+Tests run against a real Postgres database (not SQLite — the schema uses
+CITEXT, JSONB, and Postgres-only CHECK constraints that a fake DB can't
+validate). Create a dedicated test database once:
+
+```bash
+psql -h localhost -U postgres -c "CREATE DATABASE fintech_ops_test;"
+```
+
+Then, with `DATABASE_URL` pointed at it:
+
+```bash
+export DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/fintech_ops_test
+alembic upgrade head   # once, or after adding a migration
+pytest -q
+```
+
+Each test runs inside its own transaction (rolled back at the end), so tests
+never see each other's data and the test database stays empty between runs.
+CI (`.github/workflows/backend-ci.yml`) runs this same flow against a
+Postgres service container on every push/PR that touches `backend/`.
 
 ## Architecture
 

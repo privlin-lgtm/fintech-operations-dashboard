@@ -38,3 +38,11 @@ class UserRepository(BaseRepository[User]):
         await self.session.flush()
         await self.session.refresh(user)
         return user
+
+    async def bump_token_version(self, user: User) -> User:
+        """Invalidates every access token already issued to this user — the
+        'tv' claim they carry stops matching on the very next request."""
+        user.token_version += 1
+        await self.session.flush()
+        await self.session.refresh(user)
+        return user
