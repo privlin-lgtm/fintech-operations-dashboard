@@ -20,6 +20,25 @@ test.describe('Fintech operations desk', () => {
     await expect(page.getByRole('main').getByRole('heading', { name: 'Operations dashboard' })).toBeVisible()
   })
 
+  test('session survives a page reload', async ({ page }) => {
+    // Regression coverage: the frontend used to store the refresh token in
+    // localStorage and never survived past the access token's lifetime once
+    // the backend moved to an httpOnly refresh cookie. A reload is the
+    // simplest real-browser way to force the app to re-bootstrap its
+    // session from nothing but that cookie, with no JS-visible state at all.
+    const login = new LoginPage(page)
+    const investigator = seedData.users.investigator
+
+    await login.signIn(investigator.email, seedData.password)
+    await expect(page.getByText(investigator.email)).toBeVisible()
+
+    await page.reload()
+
+    await expect(page.getByRole('main').getByRole('heading', { name: 'Operations dashboard' })).toBeVisible()
+    await expect(page.getByText(investigator.email)).toBeVisible()
+    await expect(page).toHaveURL('/')
+  })
+
   test('search customer', async ({ page }) => {
     const login = new LoginPage(page)
     const app = new AppShell(page)
