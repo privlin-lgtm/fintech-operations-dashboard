@@ -9,12 +9,20 @@ import {
 } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { fetchCurrentUser, login as loginRequest, logout as logoutRequest } from '@/features/auth/authApi'
-import { setSessionExpiredHandler } from '@/lib/api'
+import {
+  fetchCurrentUser,
+  login as loginRequest,
+  logout as logoutRequest,
+} from '@/features/auth/authApi'
+import { ensureFreshToken, setAccessToken, setSessionExpiredHandler } from '@/lib/api'
 import { authKeys } from '@/lib/queryKeys'
-import { clearTokens, getAccessToken, getRefreshToken, setTokens } from '@/lib/storage'
 import type { LoginCredentials } from '@/types/auth'
 import type { User } from '@/types/user'
+
+// 'bootstrapping': we don't yet know if the httpOnly refresh cookie from a
+// previous session is still good — nothing else can render until this
+// resolves. 'authenticated'/'unauthenticated' are the settled states.
+type SessionStatus = 'bootstrapping' | 'authenticated' | 'unauthenticated'
 
 type AuthContextValue = {
   user: User | undefined
@@ -28,14 +36,15 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
-  const [hasToken, setHasToken] = useState(() => Boolean(getAccessToken()))
+  const [status, setStatus] = useState<SessionStatus>('bootstrapping')
 
   // The API client calls this the moment ANY request's 401 can't be resolved
   // by a refresh — not just the /auth/me query below — so a session that
   // expires while the user is deep in a case detail page still recovers
   // cleanly instead of leaving every query on the page silently broken.
   const handleSessionExpired = useCallback(() => {
-    setHasToken(false)
+    setAccessToken(null)
+    setStatus('unauthenticated')
     queryClient.clear()
   }, [queryClient])
 
@@ -44,32 +53,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => setSessionExpiredHandler(null)
   }, [handleSessionExpired])
 
+  // On mount, trade whatever httpOnly refresh cookie the browser still has
+  // for a fresh access token — this is what makes a session survive a page
+  // reload, since the access token itself is never persisted anywhere.
+  // Routed through the same single-flight ensureFreshToken() the 401-retry
+  // path uses: React StrictMode double-invokes this effect in dev, and the
+  // refresh token is single-use, so without sharing that lock the second
+  // invocation's call would always lose the race and 401.
+  useEffect(() => {
+    let cancelled = false
+    ensureFreshToken()
+      .then(() => {
+        if (cancelled) return
+        setStatus('authenticated')
+      })
+      .catch(() => {
+        if (cancelled) return
+        setStatus('unauthenticated')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const userQuery = useQuery({
     queryKey: authKeys.me(),
     queryFn: fetchCurrentUser,
-    enabled: hasToken,
+    enabled: status === 'authenticated',
     retry: false,
   })
 
   const loginMutation = useMutation({
     mutationFn: loginRequest,
     onSuccess: (tokens) => {
-      setTokens(tokens.access_token, tokens.refresh_token)
-      setHasToken(true)
+      setAccessToken(tokens.access_token)
+      setStatus('authenticated')
       void queryClient.invalidateQueries({ queryKey: authKeys.me() })
     },
   })
 
   const logoutMutation = useMutation({
-    mutationFn: async () => {
-      const refreshToken = getRefreshToken()
-      if (refreshToken) {
-        await logoutRequest(refreshToken)
-      }
-    },
+    mutationFn: logoutRequest,
     onSettled: () => {
-      clearTokens()
-      setHasToken(false)
+      setAccessToken(null)
+      setStatus('unauthenticated')
       queryClient.clear()
     },
   })
@@ -88,16 +115,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthContextValue>(
     () => ({
       user: userQuery.data,
-      isAuthenticated: hasToken && Boolean(userQuery.data),
+      isAuthenticated: status === 'authenticated' && Boolean(userQuery.data),
       isLoading:
-        (hasToken && userQuery.isLoading) ||
+        status === 'bootstrapping' ||
+        (status === 'authenticated' && userQuery.isLoading) ||
         loginMutation.isPending ||
         logoutMutation.isPending,
       login,
       logout,
     }),
     [
-      hasToken,
+      status,
       login,
       loginMutation.isPending,
       logout,

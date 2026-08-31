@@ -14,9 +14,6 @@ export async function fetchCurrentUser(): Promise<User> {
   return apiRequest<User>('/auth/me')
 }
 
-export async function logout(refreshToken: string): Promise<void> {
-  await apiRequest<void>('/auth/logout', {
-    method: 'POST',
-    body: { refresh_token: refreshToken },
-  })
+export async function logout(): Promise<void> {
+  await apiRequest<void>('/auth/logout', { method: 'POST' })
 }

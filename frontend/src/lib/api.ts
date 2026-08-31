@@ -1,4 +1,3 @@
-import { clearTokens, getAccessToken, getRefreshToken, setTokens } from '@/lib/storage'
 import type { TokenResponse } from '@/types/auth'
 
 export class ApiError extends Error {
@@ -19,8 +18,22 @@ type RequestOptions = {
   method?: string
   body?: unknown
   signal?: AbortSignal
-  /** Skip attaching a bearer token and skip the refresh-on-401 flow — for /auth/login. */
+  /** Skip attaching a bearer token and skip the refresh-on-401 flow — for /auth/login and /auth/refresh. */
   skipAuth?: boolean
+}
+
+// The access token lives in memory only, never in localStorage — it's the
+// one place a stored XSS payload could otherwise read it back out. The
+// refresh token never reaches JS at all: it's an httpOnly cookie the browser
+// attaches automatically to same-site requests against its own scoped path.
+let accessToken: string | null = null
+
+export function setAccessToken(token: string | null): void {
+  accessToken = token
+}
+
+export function getAccessToken(): string | null {
+  return accessToken
 }
 
 let refreshPromise: Promise<void> | null = null
@@ -36,15 +49,10 @@ export function setSessionExpiredHandler(handler: (() => void) | null): void {
 }
 
 async function refreshAccessToken(): Promise<void> {
-  const refreshToken = getRefreshToken()
-  if (!refreshToken) {
-    throw new ApiError('No refresh token available', 401)
-  }
-
   const response = await fetch(`${API_BASE}/auth/refresh`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ refresh_token: refreshToken }),
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
   })
 
   if (!response.ok) {
@@ -52,16 +60,18 @@ async function refreshAccessToken(): Promise<void> {
   }
 
   const tokens = (await response.json()) as TokenResponse
-  setTokens(tokens.access_token, tokens.refresh_token)
+  setAccessToken(tokens.access_token)
 }
 
 /**
- * Every caller that hits a 401 awaits this SAME promise instead of calling
- * /auth/refresh itself — the backend's refresh token is single-use and
- * rotates on every call, so two concurrent refreshes would have the second
- * one fail by design.
+ * Every caller that needs a fresh access token — a 401 retry, or
+ * AuthProvider's bootstrap-on-mount — awaits this SAME promise instead of
+ * calling /auth/refresh itself. The backend's refresh token is single-use
+ * and rotates on every call, so two concurrent refreshes would have the
+ * second one fail by design (this is also what makes it safe against React
+ * StrictMode double-invoking an effect that calls this on mount).
  */
-function ensureFreshToken(): Promise<void> {
+export function ensureFreshToken(): Promise<void> {
   refreshPromise ??= refreshAccessToken().finally(() => {
     refreshPromise = null
   })
@@ -75,11 +85,8 @@ async function rawFetch(path: string, options: RequestOptions): Promise<Response
     headers['Content-Type'] = 'application/json'
   }
 
-  if (!options.skipAuth) {
-    const token = getAccessToken()
-    if (token) {
-      headers.Authorization = `Bearer ${token}`
-    }
+  if (!options.skipAuth && accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`
   }
 
   return fetch(`${API_BASE}${path}`, {
@@ -87,6 +94,11 @@ async function rawFetch(path: string, options: RequestOptions): Promise<Response
     headers,
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
     signal: options.signal,
+    // Needed both ways: to send the httpOnly refresh cookie back on /auth/refresh
+    // and /auth/logout, and to let the browser store it in the first place from
+    // /auth/login's Set-Cookie — neither happens on a cross-origin request
+    // without this, even though the cookie itself is same-site scoped.
+    credentials: 'include',
   })
 }
 
@@ -97,18 +109,18 @@ async function authFetch(path: string, options: RequestOptions, attempt = 0): Pr
     return response
   }
 
-  if (attempt === 0 && getRefreshToken()) {
+  if (attempt === 0) {
     try {
       await ensureFreshToken()
     } catch {
-      clearTokens()
+      setAccessToken(null)
       sessionExpiredHandler?.()
       return response
     }
     return authFetch(path, options, attempt + 1)
   }
 
-  clearTokens()
+  setAccessToken(null)
   sessionExpiredHandler?.()
   return response
 }

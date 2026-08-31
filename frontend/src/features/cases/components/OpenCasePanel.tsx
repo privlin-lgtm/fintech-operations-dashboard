@@ -24,7 +24,7 @@ function errorMessage(error: unknown): string | null {
 export function OpenCasePanel({ customerId }: { customerId: string }) {
   const navigate = useNavigate()
   const mutation = useCreateCase()
-  const { register, handleSubmit, formState } = useForm<OpenCaseValues>({
+  const { register, handleSubmit } = useForm<OpenCaseValues>({
     defaultValues: { caseType: 'fraud', priority: 'high' },
   })
 
