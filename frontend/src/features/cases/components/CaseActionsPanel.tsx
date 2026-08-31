@@ -181,22 +181,26 @@ export function CaseActionsPanel({ caseItem }: { caseItem: CaseDetail }) {
   const isClosed = caseItem.status.startsWith('closed')
 
   return (
-    <Can permission="case:write">
-      <div className="grid gap-6 xl:grid-cols-2">
+    <div className="grid gap-6 xl:grid-cols-2">
+      <Can permission="case:note">
         <Card title="Add note">
           <AddNoteForm caseId={caseItem.id} />
         </Card>
-        {isClosed ? null : (
-          <>
+      </Can>
+      {isClosed ? null : (
+        <>
+          <Can permission="case:close">
             <Card title="Close case" description="Requires a resolution code and a closing summary.">
               <CloseCaseForm caseId={caseItem.id} />
             </Card>
+          </Can>
+          <Can permission="case:reassign">
             <Card title="Reassign">
               <ReassignForm caseId={caseItem.id} />
             </Card>
-          </>
-        )}
-      </div>
-    </Can>
+          </Can>
+        </>
+      )}
+    </div>
   )
 }

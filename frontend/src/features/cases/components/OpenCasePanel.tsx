@@ -44,7 +44,7 @@ export function OpenCasePanel({ customerId }: { customerId: string }) {
   })
 
   return (
-    <Can permission="case:write">
+    <Can permission="case:create">
       <Card title="Open investigation case" description="Start a new case for this customer.">
         <form
           data-testid="open-case-form"

@@ -185,20 +185,24 @@ export function AlertActionsPanel({ alert }: { alert: Alert }) {
   }
 
   return (
-    <Can permission="alert:write">
-      <div className="grid gap-6 xl:grid-cols-2">
-        {alert.status === 'new' ? (
+    <div className="grid gap-6 xl:grid-cols-2">
+      {alert.status === 'new' ? (
+        <Can permission="alert:assign">
           <Card title="Assign" description="Route this alert to an analyst or investigator.">
             <AssignForm alertId={alert.id} />
           </Card>
-        ) : null}
+        </Can>
+      ) : null}
+      <Can permission="alert:resolve">
         <Card title="Resolve" description="Close this alert with a documented reason.">
           <ResolveForm alertId={alert.id} />
         </Card>
+      </Can>
+      <Can permission="alert:escalate">
         <Card title="Escalate" description="Send this alert into a case investigation.">
           <EscalateForm alertId={alert.id} />
         </Card>
-      </div>
-    </Can>
+      </Can>
+    </div>
   )
 }
