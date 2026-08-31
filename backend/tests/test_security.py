@@ -58,7 +58,15 @@ def test_verify_token_rejects_expired_token():
 
 def test_verify_token_rejects_bad_signature():
     token = create_access_token("user-123")
-    tampered = token[:-1] + ("A" if token[-1] != "A" else "B")
+    header, payload, signature = token.split(".")
+    # Flip a character in the middle of the signature, not the last one — the
+    # last base64url character can decode to the same byte after a flip
+    # (padding-bit redundancy), which made this test flaky.
+    mid = len(signature) // 2
+    flipped = "A" if signature[mid] != "A" else "B"
+    tampered_signature = signature[:mid] + flipped + signature[mid + 1 :]
+    tampered = f"{header}.{payload}.{tampered_signature}"
+
     with pytest.raises(ValueError):
         verify_token(tampered, expected_type="access")
 

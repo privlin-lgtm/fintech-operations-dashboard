@@ -1,4 +1,7 @@
+from enum import Enum
 from uuid import UUID
+
+from sqlalchemy.exc import IntegrityError
 
 from app.core.exceptions import ConflictError, NotFoundError
 from app.core.pagination import decode_cursor, paginate
@@ -90,7 +93,7 @@ class CustomerService:
         if data.email:
             existing = await self.customer_repo.get_by_email(str(data.email))
             if existing is not None:
-                raise ConflictError(f"Customer with email {data.email!r} already exists")
+                raise ConflictError("A customer with that email already exists")
 
         customer = Customer(
             full_name=data.full_name,
@@ -100,7 +103,14 @@ class CustomerService:
             risk_tier=data.risk_tier.value,
             status=data.status.value,
         )
-        created = await self.customer_repo.add(customer)
+        try:
+            created = await self.customer_repo.add(customer)
+        except IntegrityError as exc:
+            # The pre-check above is a fast, friendly path — this is the real
+            # guard, since two concurrent creates can both pass that check
+            # before either commits (ux_customers_email_active is the backstop).
+            raise ConflictError("A customer with that email already exists") from exc
+
         await self.audit_repo.record(
             actor_id=actor.id,
             action="create",
@@ -121,13 +131,16 @@ class CustomerService:
                 email = str(email)
                 existing = await self.customer_repo.get_by_email(email)
                 if existing is not None and existing.id != customer.id:
-                    raise ConflictError(f"Customer with email {email!r} already exists")
+                    raise ConflictError("A customer with that email already exists")
             customer.email = email
 
         for field, value in payload.items():
-            setattr(customer, field, value.value if hasattr(value, "value") else value)
+            setattr(customer, field, value.value if isinstance(value, Enum) else value)
 
-        await self.customer_repo.session.flush()
+        try:
+            await self.customer_repo.session.flush()
+        except IntegrityError as exc:
+            raise ConflictError("A customer with that email already exists") from exc
         await self.customer_repo.session.refresh(customer)
         await self.audit_repo.record(
             actor_id=actor.id,
@@ -140,6 +153,15 @@ class CustomerService:
 
     async def delete(self, customer_id: UUID, *, actor: User) -> None:
         customer = await self._get_or_404(customer_id)
+
+        open_cases = await self.case_repo.count(
+            Case.customer_id == customer_id, Case.status.not_like("closed%")
+        )
+        if open_cases:
+            raise ConflictError(
+                f"Cannot delete customer with {open_cases} open case(s) — close them first"
+            )
+
         await self.customer_repo.soft_delete(customer)
         await self.audit_repo.record(
             actor_id=actor.id,

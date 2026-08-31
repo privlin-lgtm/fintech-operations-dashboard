@@ -9,9 +9,10 @@ from __future__ import annotations
 
 import base64
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Callable, Protocol, TypeVar
+from typing import Any, Protocol, TypeVar
 from uuid import UUID
 
 from app.core.exceptions import InvalidCursorError, ValidationConflictError

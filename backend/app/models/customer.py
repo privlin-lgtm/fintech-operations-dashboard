@@ -13,6 +13,20 @@ if TYPE_CHECKING:
     from app.models.case import Case
 
 
+# Single source of truth for "what can a caller sort customer search by" —
+# repositories/customer.py maps these to real ORM columns, schemas/customer.py
+# derives the request-validation Literal from the same tuple, so the two
+# can't drift out of sync with each other.
+CUSTOMER_SORTABLE_FIELDS: tuple[str, ...] = (
+    "created_at",
+    "updated_at",
+    "full_name",
+    "risk_tier",
+    "status",
+    "kyc_status",
+)
+
+
 class Customer(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "customers"
 

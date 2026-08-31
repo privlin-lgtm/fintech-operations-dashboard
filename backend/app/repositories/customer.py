@@ -7,18 +7,13 @@ from sqlalchemy import Text, and_, func, or_
 from sqlalchemy.sql import ColumnElement
 
 from app.core.sorting import SortCursor, SortSpec, parse_sort
-from app.models.customer import Customer
+from app.models.customer import CUSTOMER_SORTABLE_FIELDS, Customer
 from app.repositories.base import BaseRepository
 
 _LIKE_ESCAPE_RE = re.compile(r"([%_\\])")
 
 CUSTOMER_SORT_COLUMNS: dict[str, Any] = {
-    "created_at": Customer.created_at,
-    "updated_at": Customer.updated_at,
-    "full_name": Customer.full_name,
-    "risk_tier": Customer.risk_tier,
-    "status": Customer.status,
-    "kyc_status": Customer.kyc_status,
+    field: getattr(Customer, field) for field in CUSTOMER_SORTABLE_FIELDS
 }
 
 

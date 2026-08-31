@@ -4,33 +4,24 @@ Read responses mask email/phone by default (SEC-3). An explicit reveal action is
 out of scope for this module.
 """
 
-from datetime import datetime
 from typing import Literal
-from uuid import UUID
 
 from pydantic import EmailStr, Field, field_validator
 
+from app.models.customer import CUSTOMER_SORTABLE_FIELDS
 from app.models.enums import CustomerStatus, KycStatus, RiskTier
 from app.schemas.account import AccountRead
 from app.schemas.alert import AlertRead
 from app.schemas.base import ORMModel, TimestampSchema, UUIDSchema
 from app.schemas.case import CaseRead
 
-# Fields callers may sort by. Leading "-" means descending (e.g. "-created_at").
-CustomerSortField = Literal[
-    "created_at",
-    "-created_at",
-    "updated_at",
-    "-updated_at",
-    "full_name",
-    "-full_name",
-    "risk_tier",
-    "-risk_tier",
-    "status",
-    "-status",
-    "kyc_status",
-    "-kyc_status",
-]
+# Fields callers may sort by, derived from the same tuple the repository maps
+# to real columns (CUSTOMER_SORTABLE_FIELDS) — one list, not two kept in sync
+# by hand. Leading "-" means descending (e.g. "-created_at").
+_CUSTOMER_SORT_VALUES = tuple(CUSTOMER_SORTABLE_FIELDS) + tuple(
+    f"-{field}" for field in CUSTOMER_SORTABLE_FIELDS
+)
+CustomerSortField = Literal[*_CUSTOMER_SORT_VALUES]
 
 
 def _mask_email(email: str | None) -> str | None:

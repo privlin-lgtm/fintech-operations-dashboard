@@ -4,12 +4,17 @@ Service tests use AsyncMock repositories so they don't need Postgres.
 """
 
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
 
-from app.core.exceptions import ConflictError, NotFoundError, ValidationConflictError
+from app.core.exceptions import (
+    ConflictError,
+    InvalidCursorError,
+    NotFoundError,
+    ValidationConflictError,
+)
 from app.core.sorting import (
     SortCursor,
     decode_sort_cursor,
@@ -71,6 +76,7 @@ def _service(
     customer_repo.session = AsyncMock()
     account_repo = AsyncMock()
     case_repo = AsyncMock()
+    case_repo.count.return_value = 0  # "no open cases" by default; override per test
     alert_repo = AsyncMock()
     audit_repo = audit_repo or AsyncMock()
     case_service = AsyncMock()
@@ -122,7 +128,7 @@ def test_sort_cursor_rejects_sort_mismatch():
     encoded = encode_sort_cursor(
         SortCursor(sort="-full_name", sort_value="A", id=uuid4())
     )
-    with pytest.raises(Exception):
+    with pytest.raises(InvalidCursorError):
         decode_sort_cursor(encoded, expected_sort="full_name")
 
 
@@ -256,6 +262,20 @@ async def test_delete_customer_soft_deletes_and_audits():
 
     repo.soft_delete.assert_awaited_once_with(existing)
     assert audit.record.await_args.kwargs["action"] == "delete"
+
+
+@pytest.mark.asyncio
+async def test_delete_customer_blocked_by_open_cases():
+    svc, repo, audit = _service()
+    existing = _customer()
+    repo.get_active_by_id.return_value = existing
+    svc.case_repo.count.return_value = 2
+
+    with pytest.raises(ConflictError):
+        await svc.delete(existing.id, actor=_actor())
+
+    repo.soft_delete.assert_not_awaited()
+    audit.record.assert_not_awaited()
 
 
 @pytest.mark.asyncio

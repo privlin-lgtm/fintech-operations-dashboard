@@ -91,11 +91,23 @@ create table customers (
     deleted_at               timestamptz
 );
 
+create unique index ux_customers_email_active on customers (email) where deleted_at is null;
+
 create index ix_customers_email_trgm on customers using gin ((email::text) gin_trgm_ops) where deleted_at is null;
 create index ix_customers_name_trgm  on customers using gin (full_name gin_trgm_ops) where deleted_at is null;
 create index ix_customers_phone      on customers (phone) where deleted_at is null;
 create index ix_customers_phone_trgm on customers using gin (phone gin_trgm_ops) where deleted_at is null;
-create index ix_customers_risk_tier  on customers (risk_tier) where deleted_at is null;
+
+-- One (column, id) composite per sortable field (app.models.customer.
+-- CUSTOMER_SORTABLE_FIELDS) — the id tiebreaker is what keeps keyset
+-- pagination correct, and Postgres serves both sort directions off a single
+-- ascending index via a backward scan, so there's no separate desc variant.
+create index ix_customers_created_at_id on customers (created_at, id) where deleted_at is null;
+create index ix_customers_updated_at_id on customers (updated_at, id) where deleted_at is null;
+create index ix_customers_full_name_id  on customers (full_name, id)  where deleted_at is null;
+create index ix_customers_risk_tier_id  on customers (risk_tier, id)  where deleted_at is null;
+create index ix_customers_status_id     on customers (status, id)     where deleted_at is null;
+create index ix_customers_kyc_status_id on customers (kyc_status, id) where deleted_at is null;
 
 create trigger trg_customers_updated_at
 before update on customers
