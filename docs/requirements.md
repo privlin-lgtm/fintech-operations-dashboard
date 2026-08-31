@@ -1,4 +1,5 @@
 # Software Requirements Specification
+
 ## Fintech Operations Dashboard
 
 | | |
@@ -58,6 +59,7 @@ Mid-sized fintech companies (digital banks, payment processors, lending platform
 ## 2. User Personas
 
 ### Persona 1 — Ava Chen, Tier 1/2 Operations Analyst
+
 - **Role:** Front-line customer support agent handling inbound tickets about declined payments, missing deposits, and account questions.
 - **Goals:** Resolve customer inquiries in a single interaction; quickly confirm identity and transaction status; escalate to fraud/compliance when something looks wrong.
 - **Pain points today:** Has to open the core banking admin panel and a separate transaction processor dashboard to answer one question; has no way to see if a case already exists for this customer.
@@ -65,6 +67,7 @@ Mid-sized fintech companies (digital banks, payment processors, lending platform
 - **Primary modules used:** Customer Search, Transaction Lookup, Case Management (create/view only).
 
 ### Persona 2 — Marcus Webb, Fraud & AML Investigator
+
 - **Role:** Investigates fraud alerts and suspicious-activity cases; may need to file internal escalations toward a SAR (Suspicious Activity Report) equivalent.
 - **Goals:** Triage alerts quickly, build a complete evidence trail on a case, collaborate with peers, meet regulatory SLA deadlines (e.g., 30/60-day windows).
 - **Pain points today:** Alerts arrive in a vendor tool with no link back to case notes; evidence lives in email; no audit trail of decisions.
@@ -72,6 +75,7 @@ Mid-sized fintech companies (digital banks, payment processors, lending platform
 - **Primary modules used:** Alerts, Case Management, Transaction Lookup, Customer Search, Reports.
 
 ### Persona 3 — Priya Nair, Operations Team Lead / Compliance Manager
+
 - **Role:** Manages a team of analysts and investigators; owns SLA performance and audit-readiness.
 - **Goals:** See case backlog and SLA risk at a glance; reassign/escalate cases; produce reports for leadership and regulators without asking engineering for a one-off query.
 - **Pain points today:** Has to manually compile spreadsheets from multiple exports to answer "how many open fraud cases are older than 5 days?"
@@ -79,6 +83,7 @@ Mid-sized fintech companies (digital banks, payment processors, lending platform
 - **Primary modules used:** Reports, Case Management (oversight/reassignment), Alerts (rule tuning), all modules for spot-checks.
 
 ### Persona 4 — David Kim, Platform/Support Engineer (Internal Admin)
+
 - **Role:** Administers the platform — user accounts, roles, alert rule configuration, integrations.
 - **Goals:** Onboard/offboard users quickly and correctly, ensure least-privilege access, keep the audit log intact, respond to access/security questions from compliance.
 - **Pain points today:** Access requests are handled ad hoc via Slack with no consistent record of who approved what.
@@ -90,9 +95,11 @@ Mid-sized fintech companies (digital banks, payment processors, lending platform
 ## 3. Scope
 
 ### In scope (v1)
+
 Customer Search, Transaction Lookup, Case Management, Alerts, Reports, plus the cross-cutting Authentication/Authorization, Audit Logging, and Admin/User Management needed to make those five modules usable and defensible.
 
 ### Out of scope (v1, candidates for v2+)
+
 - Real-time payment initiation or reversal actions.
 - Machine-learning-based fraud scoring (v1 consumes a `risk_score` field as input; it does not compute one).
 - Customer-facing UI.
@@ -207,16 +214,19 @@ Each requirement has a unique ID for traceability into user stories, acceptance 
 Grouped by module. Format: `US-<module>-<n>`.
 
 ### Customer Search
+
 - **US-CS-1**: As Ava (Analyst), I want to search for a customer by phone number or email, so that I can quickly find the right account during a support call.
 - **US-CS-2**: As Ava (Analyst), I want to see if a customer already has an open case before I create a new one, so that I don't duplicate work.
 - **US-CS-3**: As Marcus (Investigator), I want to see a customer's risk tier and KYC status on their profile, so that I can triage how carefully to investigate their activity.
 
 ### Transaction Lookup
+
 - **US-TL-1**: As Ava (Analyst), I want to look up a specific transaction by ID and see its full status history, so that I can tell a customer exactly why their payment is delayed.
 - **US-TL-2**: As Marcus (Investigator), I want to filter a customer's transactions by amount and date range, so that I can identify a pattern of suspicious activity.
 - **US-TL-3**: As Marcus (Investigator), I want to attach relevant transactions directly to a case, so that the evidence trail is complete without manual copy-pasting of transaction IDs.
 
 ### Case Management
+
 - **US-CM-1**: As Ava (Analyst), I want to open a dispute case linked to a customer and transaction, so that the issue is tracked from a single ticket instead of scattered emails.
 - **US-CM-2**: As Marcus (Investigator), I want to add timestamped notes and upload evidence to a case, so that anyone who picks it up later understands the full history.
 - **US-CM-3**: As Priya (Team Lead), I want to see all cases approaching their SLA deadline across my team, so that I can reassign work before we breach a regulatory timeline.
@@ -224,17 +234,20 @@ Grouped by module. Format: `US-<module>-<n>`.
 - **US-CM-5**: As Marcus (Investigator), I want the system to require a resolution code and summary before I can close a case, so that closed cases are always audit-ready.
 
 ### Alerts
+
 - **US-AL-1**: As Marcus (Investigator), I want a prioritized alert queue sorted by severity and age, so that I always work the highest-risk item first.
 - **US-AL-2**: As Marcus (Investigator), I want to escalate an alert directly into a new case with context carried over, so that I don't have to re-enter customer and transaction details.
 - **US-AL-3**: As David (Admin), I want to configure alert rules (thresholds, conditions) without a code deploy, so that compliance can tune detection as regulations or risk patterns change.
 - **US-AL-4**: As Marcus (Investigator), I want to add a customer to a manual watchlist, so that any future activity on their account surfaces to me automatically.
 
 ### Reports
+
 - **US-RP-1**: As Priya (Team Lead), I want a dashboard showing open case counts by priority and SLA risk, so that I can staff my team correctly each morning.
 - **US-RP-2**: As Priya (Compliance Manager), I want to export a full audit trail for a specific case, so that I can respond to a regulator or internal auditor request within the required timeframe.
 - **US-RP-3**: As Priya (Team Lead), I want to schedule a weekly case-volume report to be emailed to leadership automatically, so that I don't have to manually compile it every Monday.
 
 ### Admin / Security
+
 - **US-SYS-1**: As David (Admin), I want to deactivate a departing employee's account immediately, so that access is revoked without delay.
 - **US-SYS-2**: As David (Admin), I want every data access and permission change logged immutably, so that we can answer "who looked at this customer's data and when" at any time.
 
@@ -244,39 +257,48 @@ Grouped by module. Format: `US-<module>-<n>`.
 
 Acceptance criteria are written in Given/When/Then form and map to the user stories above.
 
-**US-CS-1 — Search by phone/email**
+### US-CS-1 — Search by phone/email
+
 - Given I am an authenticated Analyst, when I enter a full or partial phone number or email into the search bar and submit, then I see a ranked result list of matching customers within 500ms (NFR-2), each showing name, masked contact info, status, and open-case flag.
 - Given no customer matches the query, when I search, then I see a clear "no results" state with a suggestion to broaden the search.
 
-**US-CS-2 — Existing open case visibility**
+### US-CS-2 — Existing open case visibility
+
 - Given a customer has 1 or more open cases, when I view them in search results or their profile, then an "Open cases (N)" badge is visible before I can create a new case.
 - Given I attempt to create a new case for that customer, when the case-creation form loads, then it surfaces existing open cases and asks me to confirm this is not a duplicate.
 
-**US-TL-1 — Transaction status history**
+### US-TL-1 — Transaction status history
+
 - Given a valid transaction ID, when I open its detail view, then I see every lifecycle status change with a timestamp and, where available, a reason (e.g., "failed: insufficient funds").
 - Given an invalid or non-existent transaction ID, when I search for it, then I receive a clear error state, not a blank screen or stack trace.
 
-**US-CM-1 — Create a case**
+### US-CM-1 — Create a case
+
 - Given I am an Analyst viewing a customer or transaction, when I select "Create Case" and choose type = Dispute, then a case is created with status = New, linked to that customer (and transaction, if applicable), and I am set as the initial owner.
 - Given required fields (type, customer, priority) are missing, when I submit, then the system blocks submission and highlights the missing fields.
 
-**US-CM-3 — SLA risk visibility**
+### US-CM-3 — SLA risk visibility
+
 - Given a case's priority defines an SLA target (FR-CM-6), when the case is within 20% of its SLA deadline, then it is flagged "At Risk" in the queue view; when the deadline has passed, it is flagged "Breached" in a visually distinct color.
 - Given I am a Team Lead, when I open the case queue, then I can filter to show only At Risk and Breached cases across the whole team, not just my own.
 
-**US-CM-5 — Closing requires resolution**
+### US-CM-5 — Closing requires resolution
+
 - Given a case has no resolution code or closing summary, when I attempt to set status = Closed, then the system rejects the change and prompts for both fields.
 - Given both fields are provided, when I close the case, then the case becomes read-only except for compliance/admin-level reopening, and a closed timestamp and closer identity are recorded.
 
-**US-AL-2 — Escalate alert to case**
+### US-AL-2 — Escalate alert to case
+
 - Given an open alert, when I select "Escalate to Case," then a new case is created (or I can link to an existing open case for that customer) pre-populated with the alert's customer, transaction(s), and triggering reason.
 - Given the escalation completes, when I view the alert, then its status changes to "Escalated to Case" and it shows a link to the resulting case; the alert cannot be simultaneously dismissed.
 
-**US-RP-2 — Audit trail export**
+### US-RP-2 — Audit trail export
+
 - Given a case ID, when a Compliance/Auditor-role user requests an audit export, then the system generates a PDF/CSV containing every timestamped action on that case (creator, assignees, status changes, notes, attachments, linked alerts/transactions) with the identity of the actor for each entry.
 - Given the export is requested, when it is generated, then the export request itself is written to the audit log.
 
-**US-SYS-1 — Deactivate a user**
+### US-SYS-1 — Deactivate a user
+
 - Given an Admin selects "Deactivate" on a user account, when confirmed, then that user's active sessions are invalidated within 60 seconds and subsequent login attempts are rejected.
 - Given a user is deactivated, when I view the audit log, then I see who deactivated them and when.
 
@@ -305,50 +327,62 @@ Logical data model (relational). Field lists are representative, not exhaustive;
 
 ### 8.2 Key fields and relationships
 
-**customer**
+#### customer
+
 `id (PK, uuid)`, `full_name`, `email`, `phone`, `date_of_birth (encrypted)`, `kyc_status (enum: unverified/pending/verified/rejected)`, `risk_tier (enum: low/medium/high)`, `status (enum: active/suspended/closed)`, `created_at`, `updated_at`.
 → has many `account`, has many `case` (via case.customer_id), has many `alert`.
 
-**account**
+#### account
+
 `id (PK, uuid)`, `customer_id (FK → customer.id)`, `account_type (enum: checking/savings/card/loan)`, `masked_number`, `status`, `opened_at`, `closed_at`.
 → has many `transaction`.
 
-**transaction**
+#### transaction
+
 `id (PK, uuid)`, `account_id (FK → account.id)`, `amount_cents (bigint)`, `currency (char(3))`, `direction (enum: debit/credit)`, `channel (enum: ach/card/wire/internal)`, `status (enum: initiated/pending/settled/failed/reversed)`, `counterparty_masked`, `risk_score (nullable, numeric)`, `created_at`, `settled_at (nullable)`.
 → has many `transaction_status_history` (or a JSON/event-sourced history column); referenced by `case_activity.linked_transaction_id` and `alert.transaction_id`.
 *Indexes:* `(account_id, created_at)`, `(status)`, composite index supporting date-range + amount-range filters.
 
-**case**
+#### case
+
 `id (PK, uuid)`, `case_number (human-readable, unique)`, `customer_id (FK → customer.id)`, `type (enum: dispute/fraud/aml_review)`, `status (enum: new/in_progress/pending_external/escalated/closed_resolved/closed_no_action)`, `priority (enum: low/medium/high/critical)`, `owner_id (FK → internal_user.id)`, `sla_due_at`, `resolution_code (nullable)`, `closing_summary (nullable)`, `created_at`, `closed_at (nullable)`.
 → has many `case_activity`, has many `case_attachment`; many-to-many with `transaction` and `alert` via join tables (`case_transaction_link`, `case_alert_link`).
 
-**case_activity**
+#### case_activity
+
 `id (PK, uuid)`, `case_id (FK)`, `actor_id (FK → internal_user.id)`, `activity_type (enum: note/status_change/reassignment/attachment_added/link_added)`, `payload (jsonb)`, `created_at`. *(Append-only; no update/delete permitted at the application layer.)*
 
-**case_attachment**
+#### case_attachment
+
 `id (PK, uuid)`, `case_id (FK)`, `uploaded_by (FK)`, `file_name`, `storage_key`, `content_type`, `size_bytes`, `av_scan_status (enum: pending/clean/infected)`, `created_at`.
 
-**alert**
+#### alert
+
 `id (PK, uuid)`, `type (enum: high_risk_txn/velocity/sanctions_match/login_anomaly/manual_watchlist)`, `severity (enum: low/medium/high/critical)`, `status (enum: new/under_review/escalated/dismissed)`, `customer_id (FK)`, `transaction_id (nullable FK)`, `triggering_rule_id (FK → alert_rule.id, nullable for manual)`, `dismissal_reason (nullable)`, `created_at`, `resolved_at (nullable)`.
 
-**alert_rule**
+#### alert_rule
+
 `id (PK, uuid)`, `name`, `condition_definition (jsonb — e.g., {field: amount_cents, op: gt, value: 1000000})`, `severity`, `is_active (bool)`, `created_by (FK)`, `updated_at`.
 
-**internal_user**
+#### internal_user
+
 `id (PK, uuid)`, `email`, `full_name`, `role_id (FK → role.id)`, `status (enum: active/deactivated)`, `mfa_enabled (bool)`, `last_login_at`, `created_at`.
 
-**role**
+#### role
+
 `id (PK, uuid)`, `name (enum: analyst/investigator/team_lead/compliance_auditor/admin)`, `permissions (jsonb — scoped capability list)`.
 
-**audit_log**
+#### audit_log
+
 `id (PK, bigint, append-only)`, `actor_id (FK → internal_user.id)`, `action (enum: view/create/update/delete/export/login/permission_change)`, `resource_type`, `resource_id`, `metadata (jsonb)`, `ip_address`, `created_at`. *(Write-once; retained per NFR-12; no application-level delete/update endpoint exists for this table.)*
 
-**report_schedule**
+#### report_schedule
+
 `id (PK, uuid)`, `report_type`, `filters (jsonb)`, `cadence (enum: daily/weekly/monthly)`, `recipients (text[])`, `created_by (FK)`, `last_run_at`, `next_run_at`.
 
 ### 8.3 Entity relationship overview (textual)
 
-```
+```text
 customer 1---* account 1---* transaction
 customer 1---* case *---* transaction   (via case_transaction_link)
 customer 1---* alert *---* case         (via case_alert_link, on escalation)
@@ -367,6 +401,7 @@ internal_user 1---* report_schedule (as creator)
 RESTful JSON API, versioned under `/api/v1`. All endpoints require authentication (`Authorization: Bearer <token>`, OIDC-issued JWT) and are authorized per the RBAC matrix in Section 10.
 
 ### 9.1 Conventions
+
 - **Pagination:** cursor-based (`?cursor=<opaque>&limit=<n>`, default `limit=25`, max `limit=200`); responses include `next_cursor`.
 - **Filtering/sorting:** query params per resource (e.g., `?status=open&priority=high&sort=-created_at`).
 - **Errors:** RFC 7807 `application/problem+json` — `{type, title, status, detail, instance}`.
@@ -462,6 +497,7 @@ RESTful JSON API, versioned under `/api/v1`. All endpoints require authenticatio
 ## 11. Reporting Requirements
 
 ### 11.1 Standard reports
+
 | Report | Description | Primary audience |
 |---|---|---|
 | Case Volume & Aging | Cases opened/closed over time, broken down by type/priority/status, with average and p90 age. | Team Lead |
@@ -472,6 +508,7 @@ RESTful JSON API, versioned under `/api/v1`. All endpoints require authenticatio
 | Access & Permissions | Current role assignments and a history of permission changes. | Admin, Compliance |
 
 ### 11.2 Requirements
+
 - **RPT-1**: All reports support a custom date range plus quick presets (Today, 7 days, 30 days, Quarter-to-date).
 - **RPT-2**: All reports are exportable as CSV and PDF; the Audit Trail export additionally supports a structured JSON format for downstream e-discovery tooling.
 - **RPT-3**: Reports can be scheduled for recurring email delivery (daily/weekly/monthly) to one or more internal recipients; scheduled report creation/edits are audit-logged.
@@ -484,6 +521,7 @@ RESTful JSON API, versioned under `/api/v1`. All endpoints require authenticatio
 ## 12. Appendix
 
 ### 12.1 Glossary
+
 - **AML** — Anti-Money Laundering.
 - **BSA** — Bank Secrecy Act (US regulation underpinning AML program requirements).
 - **KYC** — Know Your Customer (identity verification).
@@ -493,14 +531,17 @@ RESTful JSON API, versioned under `/api/v1`. All endpoints require authenticatio
 - **RPO / RTO** — Recovery Point/Time Objective, disaster-recovery targets (NFR-7).
 
 ### 12.2 Assumptions
+
 - Data for this portfolio build is either a sanitized/synthetic dataset or a personal sandbox account; no real customer PII is used in development or demos.
 - A single-tenant deployment is assumed for v1 (no multi-organization/white-label support).
 - Upstream systems (core ledger, KYC vendor, fraud-scoring engine) are simulated via seed data and/or mock services rather than live third-party integrations, unless a specific integration is explicitly built out.
 
 ### 12.3 Suggested technology direction (non-binding)
+
 A conventional, well-supported stack is recommended to keep the portfolio build focused on product/architecture quality rather than tooling risk: a typed backend (e.g., Node/TypeScript or Python) exposing the REST API in Section 9, PostgreSQL for the relational model in Section 8, a background job runner for scheduled reports and async exports, object storage for case attachments, and a React/TypeScript frontend. These are suggestions, not requirements — the functional, data, and security requirements above are the durable contract.
 
 ### 12.4 Suggested delivery milestones
+
 1. **Foundation:** auth/RBAC, data model, audit logging skeleton.
 2. **Core lookup:** Customer Search + Transaction Lookup (read-only, highest immediate value, lowest workflow complexity).
 3. **Case Management:** creation, timeline, SLA tracking, closure workflow.
