@@ -5,10 +5,12 @@ on:
     branches: [main, master]
     paths:
       - "backend/**"
+      - "db/**"
       - ".github/workflows/backend-ci.yml"
   pull_request:
     paths:
       - "backend/**"
+      - "db/**"
       - ".github/workflows/backend-ci.yml"
 
 defaults:
@@ -49,10 +51,56 @@ jobs:
         run: pip install -e ".[dev]"
 
       - name: Lint
-        run: ruff check app/ alembic/ tests/
+        run: ruff check app/ alembic/ tests/ scripts/
 
       - name: Run migrations
         run: alembic upgrade head
 
       - name: Test
         run: pytest -q
+
+  schema-drift:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Create scratch databases
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -c "CREATE DATABASE schema_check_sql;"
+          PGPASSWORD=postgres psql -h localhost -U postgres -c "CREATE DATABASE schema_check_alembic;"
+
+      - name: Apply db/schema.sql
+        run: PGPASSWORD=postgres psql -h localhost -U postgres -d schema_check_sql -f ../db/schema.sql
+
+      - name: Apply alembic migrations
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/schema_check_alembic
+        run: alembic upgrade head
+
+      - name: Check for drift
+        run: >
+          python scripts/check_schema_drift.py
+          postgresql+asyncpg://postgres:postgres@localhost:5432/schema_check_sql
+          postgresql+asyncpg://postgres:postgres@localhost:5432/schema_check_alembic

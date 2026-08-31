@@ -32,13 +32,19 @@ src/
   features/       Domain modules (auth, dashboard, …)
   pages/          Route-level pages
   routes/         Router config and guards
-  lib/            API client, query client, storage
+  lib/            API client, query client
   types/          Shared TypeScript types
 ```
 
 ## Auth
 
-Sign in at `/login` using credentials from the backend. JWT tokens are stored in `localStorage` and attached to API requests automatically.
+Sign in at `/login` using credentials from the backend. The access token lives
+in memory only (never `localStorage`) and is attached to API requests
+automatically; the refresh token is an httpOnly cookie the browser manages —
+no frontend code ever sees it. On mount, the app silently trades that cookie
+for a fresh access token, which is what makes a session survive a page
+reload. See the root [README](../README.md#authentication--cookies) for why
+this requires the frontend and API to be same-site in production.
 
 ## End-to-end tests
 

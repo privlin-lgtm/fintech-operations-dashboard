@@ -55,14 +55,15 @@ create table users (
     mfa_enabled      boolean not null default false,
     mfa_secret       text,   -- Fernet-encrypted base32 TOTP secret; null until the user enrolls
     token_version    bigint not null default 0,   -- bumped to invalidate outstanding access tokens
-    status           text not null default 'active'
-                         check (status in ('active', 'deactivated')),
+    status           text not null default 'active',
     failed_login_attempts bigint not null default 0,  -- reset on success; drives exponential lockout backoff
     locked_until     timestamptz,   -- null unless currently locked out from repeated failed logins
     last_login_at    timestamptz,
     created_at       timestamptz not null default now(),
     updated_at       timestamptz not null default now(),
-    deleted_at       timestamptz
+    deleted_at       timestamptz,
+
+    constraint ck_users_status check (status in ('active', 'deactivated'))
 );
 
 create unique index ux_users_email_active on users (email) where deleted_at is null;
@@ -82,15 +83,16 @@ create table customers (
     email                    citext,
     phone                    text,
     date_of_birth_encrypted  bytea,   -- encrypted at the application layer (KMS-backed); never plaintext
-    kyc_status               text not null default 'unverified'
-                                 check (kyc_status in ('unverified', 'pending', 'verified', 'rejected')),
-    risk_tier                text not null default 'low'
-                                 check (risk_tier in ('low', 'medium', 'high')),
-    status                   text not null default 'active'
-                                 check (status in ('active', 'suspended', 'closed')),
+    kyc_status               text not null default 'unverified',
+    risk_tier                text not null default 'low',
+    status                   text not null default 'active',
     created_at               timestamptz not null default now(),
     updated_at               timestamptz not null default now(),
-    deleted_at               timestamptz
+    deleted_at               timestamptz,
+
+    constraint ck_customers_kyc_status check (kyc_status in ('unverified', 'pending', 'verified', 'rejected')),
+    constraint ck_customers_risk_tier check (risk_tier in ('low', 'medium', 'high')),
+    constraint ck_customers_status check (status in ('active', 'suspended', 'closed'))
 );
 
 create unique index ux_customers_email_active on customers (email) where deleted_at is null;
@@ -122,15 +124,17 @@ for each row execute function set_updated_at();
 create table accounts (
     id             uuid primary key default gen_random_uuid(),
     customer_id    uuid not null references customers(id) on delete restrict,
-    account_type   text not null check (account_type in ('checking', 'savings', 'card', 'loan')),
+    account_type   text not null,
     masked_number  text not null,   -- e.g. '**** 4471'; full PAN is never stored here
-    status         text not null default 'active'
-                       check (status in ('active', 'closed', 'frozen')),
+    status         text not null default 'active',
     opened_at      timestamptz not null default now(),
     closed_at      timestamptz,
     created_at     timestamptz not null default now(),
     updated_at     timestamptz not null default now(),
-    deleted_at     timestamptz
+    deleted_at     timestamptz,
+
+    constraint ck_accounts_type check (account_type in ('checking', 'savings', 'card', 'loan')),
+    constraint ck_accounts_status check (status in ('active', 'closed', 'frozen'))
 );
 
 create index ix_accounts_customer_id on accounts (customer_id) where deleted_at is null;
@@ -148,21 +152,25 @@ for each row execute function set_updated_at();
 create table transactions (
     id                  uuid primary key default gen_random_uuid(),
     account_id          uuid not null references accounts(id) on delete restrict,
-    amount_cents        bigint not null check (amount_cents > 0),
+    amount_cents        bigint not null,
     currency            char(3) not null default 'USD',
-    direction           text not null check (direction in ('debit', 'credit')),
-    channel             text not null check (channel in ('ach', 'card', 'wire', 'internal')),
-    status              text not null default 'initiated'
-                            check (status in ('initiated', 'pending', 'settled', 'failed', 'reversed')),
+    direction           text not null,
+    channel             text not null,
+    status              text not null default 'initiated',
     counterparty_masked text,
     risk_score          numeric(5, 2),
     created_at          timestamptz not null default now(),
     settled_at          timestamptz,
     updated_at          timestamptz not null default now(),
-    deleted_at          timestamptz
+    deleted_at          timestamptz,
+
+    constraint ck_transactions_amount check (amount_cents > 0),
+    constraint ck_transactions_direction check (direction in ('debit', 'credit')),
+    constraint ck_transactions_channel check (channel in ('ach', 'card', 'wire', 'internal')),
+    constraint ck_transactions_status check (status in ('initiated', 'pending', 'settled', 'failed', 'reversed'))
 );
 
-create index ix_transactions_account_created on transactions (account_id, created_at desc) where deleted_at is null;
+create index ix_transactions_account_created on transactions (account_id, created_at) where deleted_at is null;
 create index ix_transactions_status           on transactions (status) where deleted_at is null;
 create index ix_transactions_amount           on transactions (amount_cents) where deleted_at is null;
 create index ix_transactions_risk_score       on transactions (risk_score) where deleted_at is null and risk_score is not null;
@@ -180,12 +188,9 @@ create table cases (
     case_number      text not null,   -- human-readable, e.g. 'CASE-2026-000482'
     customer_id      uuid not null references customers(id) on delete restrict,
     owner_id         uuid references users(id) on delete set null,
-    type             text not null check (type in ('dispute', 'fraud', 'aml_review')),
-    status           text not null default 'new'
-                         check (status in ('new', 'in_progress', 'pending_external',
-                                            'escalated', 'closed_resolved', 'closed_no_action')),
-    priority         text not null default 'medium'
-                         check (priority in ('low', 'medium', 'high', 'critical')),
+    type             text not null,
+    status           text not null default 'new',
+    priority         text not null default 'medium',
     sla_due_at       timestamptz,
     resolution_code  text,
     closing_summary  text,
@@ -194,6 +199,10 @@ create table cases (
     closed_at        timestamptz,
     deleted_at       timestamptz,
 
+    constraint ck_cases_type check (type in ('dispute', 'fraud', 'aml_review')),
+    constraint ck_cases_status check (status in ('new', 'in_progress', 'pending_external',
+                                       'escalated', 'closed_resolved', 'closed_no_action')),
+    constraint ck_cases_priority check (priority in ('low', 'medium', 'high', 'critical')),
     constraint ck_case_closed_requires_resolution check (
         status not in ('closed_resolved', 'closed_no_action')
         or (resolution_code is not null and closing_summary is not null)
@@ -253,24 +262,28 @@ create table alerts (
     customer_id        uuid not null references customers(id) on delete restrict,
     transaction_id     uuid references transactions(id) on delete set null,
     case_id            uuid references cases(id) on delete set null,   -- set on escalation
-    type               text not null check (type in
-                           ('high_risk_txn', 'velocity', 'sanctions_match', 'login_anomaly', 'manual_watchlist')),
-    severity           text not null check (severity in ('low', 'medium', 'high', 'critical')),
-    status             text not null default 'new'
-                           check (status in ('new', 'under_review', 'escalated', 'dismissed')),
+    assignee_id        uuid references users(id) on delete set null,
+    type               text not null,
+    severity           text not null,
+    status             text not null default 'new',
     triggering_reason  text not null,
-    dismissal_reason   text,
+    dismissal_reason   text,   -- despite the name, this is the resolution note for any terminal status
     created_at         timestamptz not null default now(),
     resolved_at        timestamptz,
     updated_at         timestamptz not null default now(),
     deleted_at         timestamptz,
 
-    constraint ck_alert_dismissal_reason check (status <> 'dismissed' or dismissal_reason is not null),
+    constraint ck_alerts_type check (type in
+                           ('high_risk_txn', 'velocity', 'sanctions_match', 'login_anomaly', 'manual_watchlist')),
+    constraint ck_alerts_severity check (severity in ('low', 'medium', 'high', 'critical')),
+    constraint ck_alerts_status check (status in ('new', 'assigned', 'escalated', 'resolved')),
+    constraint ck_alert_resolution_reason check (status <> 'resolved' or dismissal_reason is not null),
     constraint ck_alert_escalation_has_case check (status <> 'escalated' or case_id is not null)
 );
 
 create index ix_alerts_customer_id    on alerts (customer_id) where deleted_at is null;
 create index ix_alerts_transaction_id on alerts (transaction_id) where deleted_at is null;
+create index ix_alerts_assignee_id    on alerts (assignee_id) where deleted_at is null;
 create index ix_alerts_queue          on alerts (status, severity, created_at) where deleted_at is null;
 
 create trigger trg_alerts_updated_at
@@ -283,18 +296,21 @@ for each row execute function set_updated_at();
 -- ============================================================================
 create table reports (
     id           uuid primary key default gen_random_uuid(),
-    report_type  text not null check (report_type in
-                     ('case_volume', 'sla_compliance', 'alert_disposition',
-                      'analyst_productivity', 'audit_trail')),
+    report_type  text not null,
     filters      jsonb not null default '{}'::jsonb,
-    cadence      text check (cadence in ('once', 'daily', 'weekly', 'monthly')),
+    cadence      text,
     recipients   text[] not null default '{}',
     created_by   uuid not null references users(id) on delete restrict,
     last_run_at  timestamptz,
     next_run_at  timestamptz,
     created_at   timestamptz not null default now(),
     updated_at   timestamptz not null default now(),
-    deleted_at   timestamptz
+    deleted_at   timestamptz,
+
+    constraint ck_reports_type check (report_type in
+                     ('case_volume', 'sla_compliance', 'alert_disposition',
+                      'analyst_productivity', 'audit_trail')),
+    constraint ck_reports_cadence check (cadence in ('once', 'daily', 'weekly', 'monthly'))
 );
 
 create index ix_reports_created_by  on reports (created_by) where deleted_at is null;
@@ -315,7 +331,7 @@ create table audit_logs (
     resource_type text not null,
     resource_id   uuid not null,
     metadata      jsonb not null default '{}'::jsonb,
-    ip_address    inet,
+    ip_address    text,   -- stored as text, not inet: the source is Starlette's Request.client.host
     created_at    timestamptz not null default now()
     -- no updated_at / deleted_at: insert-only, a correction is a new row, not an edit.
 );
@@ -331,7 +347,7 @@ create index ix_audit_logs_created_at on audit_logs (created_at);
 create table refresh_tokens (
     id           uuid primary key default gen_random_uuid(),
     user_id      uuid not null references users(id) on delete cascade,
-    token_hash   text not null unique,   -- sha256 of the token; the raw value is never stored
+    token_hash   text not null,   -- sha256 of the token; the raw value is never stored
     expires_at   timestamptz not null,
     revoked_at   timestamptz,
     device_info  text,
@@ -339,6 +355,7 @@ create table refresh_tokens (
     updated_at   timestamptz not null default now()
 );
 
+create unique index ux_refresh_tokens_token_hash on refresh_tokens (token_hash);
 create index ix_refresh_tokens_user_id on refresh_tokens (user_id);
 
 create trigger trg_refresh_tokens_updated_at
