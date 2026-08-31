@@ -1,21 +1,28 @@
 from uuid import UUID
 
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import ConflictError, NotFoundError
 from app.core.pagination import decode_cursor, paginate
+from app.core.sorting import decode_sort_cursor, paginate_sorted
 from app.models.account import Account
 from app.models.alert import Alert
 from app.models.case import Case
+from app.models.customer import Customer
 from app.models.user import User
 from app.repositories.account import AccountRepository
 from app.repositories.alert import AlertRepository
 from app.repositories.audit_log import AuditLogRepository
 from app.repositories.case import CaseRepository
-from app.repositories.customer import CustomerRepository
+from app.repositories.customer import CUSTOMER_SORT_COLUMNS, CustomerRepository, parse_customer_sort
 from app.schemas.account import AccountRead
 from app.schemas.alert import AlertRead
 from app.schemas.base import PaginatedResponse
 from app.schemas.case import CaseRead
-from app.schemas.customer import CustomerProfile, CustomerRead
+from app.schemas.customer import (
+    CustomerCreate,
+    CustomerProfile,
+    CustomerRead,
+    CustomerUpdate,
+)
 from app.services.alert import AlertService
 from app.services.case import CaseService
 
@@ -43,15 +50,102 @@ class CustomerService:
         self.alert_service = alert_service
 
     async def search(
-        self, *, query: str | None, limit: int = 25, cursor: str | None = None
+        self,
+        *,
+        query: str | None = None,
+        status: str | None = None,
+        risk_tier: str | None = None,
+        kyc_status: str | None = None,
+        sort: str = "-created_at",
+        limit: int = 25,
+        cursor: str | None = None,
     ) -> PaginatedResponse[CustomerRead]:
-        parsed_cursor = decode_cursor(cursor) if cursor else None
-        rows = await self.customer_repo.search(query=query, limit=limit, cursor=parsed_cursor)
-        items, next_cursor = paginate(rows, limit)
+        sort_spec = parse_customer_sort(sort)
+        parsed_cursor = (
+            decode_sort_cursor(cursor, expected_sort=sort_spec.raw) if cursor else None
+        )
+        rows = await self.customer_repo.search(
+            query=query,
+            status=status,
+            risk_tier=risk_tier,
+            kyc_status=kyc_status,
+            sort=sort_spec,
+            limit=limit,
+            cursor=parsed_cursor,
+        )
+        column = CUSTOMER_SORT_COLUMNS[sort_spec.field]
+        items, next_cursor = paginate_sorted(
+            rows,
+            limit,
+            sort=sort_spec.raw,
+            get_sort_value=lambda row: getattr(row, column.key),
+        )
         return PaginatedResponse(
             items=[CustomerRead.model_validate(c) for c in items],
             next_cursor=next_cursor,
             limit=limit,
+        )
+
+    async def create(self, data: CustomerCreate, *, actor: User) -> CustomerRead:
+        if data.email:
+            existing = await self.customer_repo.get_by_email(str(data.email))
+            if existing is not None:
+                raise ConflictError(f"Customer with email {data.email!r} already exists")
+
+        customer = Customer(
+            full_name=data.full_name,
+            email=str(data.email) if data.email else None,
+            phone=data.phone,
+            kyc_status=data.kyc_status.value,
+            risk_tier=data.risk_tier.value,
+            status=data.status.value,
+        )
+        created = await self.customer_repo.add(customer)
+        await self.audit_repo.record(
+            actor_id=actor.id,
+            action="create",
+            resource_type="customer",
+            resource_id=created.id,
+        )
+        return CustomerRead.model_validate(created)
+
+    async def update(
+        self, customer_id: UUID, data: CustomerUpdate, *, actor: User
+    ) -> CustomerRead:
+        customer = await self._get_or_404(customer_id)
+        payload = data.model_dump(exclude_unset=True)
+
+        if "email" in payload:
+            email = payload.pop("email")
+            if email is not None:
+                email = str(email)
+                existing = await self.customer_repo.get_by_email(email)
+                if existing is not None and existing.id != customer.id:
+                    raise ConflictError(f"Customer with email {email!r} already exists")
+            customer.email = email
+
+        for field, value in payload.items():
+            setattr(customer, field, value.value if hasattr(value, "value") else value)
+
+        await self.customer_repo.session.flush()
+        await self.customer_repo.session.refresh(customer)
+        await self.audit_repo.record(
+            actor_id=actor.id,
+            action="update",
+            resource_type="customer",
+            resource_id=customer.id,
+            metadata={"fields": sorted(data.model_dump(exclude_unset=True).keys())},
+        )
+        return CustomerRead.model_validate(customer)
+
+    async def delete(self, customer_id: UUID, *, actor: User) -> None:
+        customer = await self._get_or_404(customer_id)
+        await self.customer_repo.soft_delete(customer)
+        await self.audit_repo.record(
+            actor_id=actor.id,
+            action="delete",
+            resource_type="customer",
+            resource_id=customer_id,
         )
 
     async def get_profile(self, customer_id: UUID, *, viewer: User) -> CustomerProfile:
@@ -77,7 +171,6 @@ class CustomerService:
             customer_id, limit=RECENT_PREVIEW_LIMIT
         )
 
-        # FR-CS-5: every customer record view is logged — who, when, what.
         await self.audit_repo.record(
             actor_id=viewer.id,
             action="view",
@@ -146,9 +239,12 @@ class CustomerService:
             items=[AlertRead.model_validate(a) for a in items], next_cursor=next_cursor, limit=limit
         )
 
+    async def _get_or_404(self, customer_id: UUID) -> Customer:
+        customer = await self.customer_repo.get_active_by_id(customer_id)
+        if customer is None:
+            raise NotFoundError("customer", customer_id)
+        return customer
+
     async def _ensure_exists_if_empty(self, customer_id: UUID, rows: list) -> None:
-        """Only pay for the extra existence check when the list came back empty —
-        distinguishes 'no customer' (404) from 'customer, no rows yet' (empty page)
-        without a round trip on every request."""
         if not rows and await self.customer_repo.get_active_by_id(customer_id) is None:
             raise NotFoundError("customer", customer_id)

@@ -1,13 +1,36 @@
-"""Customer records are synced read-only from the core banking/KYC system in v1
-(see docs/requirements.md §3 non-goals) — there is deliberately no
-CustomerCreate/CustomerUpdate schema here."""
+"""Customer schemas — search/list with filters & sort, plus CRUD for seed/admin ops.
 
-from pydantic import Field, field_validator
+Read responses mask email/phone by default (SEC-3). An explicit reveal action is
+out of scope for this module.
+"""
 
+from datetime import datetime
+from typing import Literal
+from uuid import UUID
+
+from pydantic import EmailStr, Field, field_validator
+
+from app.models.enums import CustomerStatus, KycStatus, RiskTier
 from app.schemas.account import AccountRead
 from app.schemas.alert import AlertRead
 from app.schemas.base import ORMModel, TimestampSchema, UUIDSchema
 from app.schemas.case import CaseRead
+
+# Fields callers may sort by. Leading "-" means descending (e.g. "-created_at").
+CustomerSortField = Literal[
+    "created_at",
+    "-created_at",
+    "updated_at",
+    "-updated_at",
+    "full_name",
+    "-full_name",
+    "risk_tier",
+    "-risk_tier",
+    "status",
+    "-status",
+    "kyc_status",
+    "-kyc_status",
+]
 
 
 def _mask_email(email: str | None) -> str | None:
@@ -34,8 +57,6 @@ class CustomerRead(UUIDSchema, TimestampSchema):
     risk_tier: str
     status: str
 
-    # Masked by default per SEC-3 (least privilege / data minimization). An
-    # explicit, audit-logged "reveal" action is the follow-up, not this endpoint.
     @field_validator("email", mode="before")
     @classmethod
     def _redact_email(cls, value: str | None) -> str | None:
@@ -57,7 +78,29 @@ class CustomerProfile(CustomerRead):
     recent_alerts: list[AlertRead] = []
 
 
+class CustomerCreate(ORMModel):
+    full_name: str = Field(min_length=1, max_length=255)
+    email: EmailStr | None = None
+    phone: str | None = Field(default=None, max_length=32)
+    kyc_status: KycStatus = KycStatus.UNVERIFIED
+    risk_tier: RiskTier = RiskTier.LOW
+    status: CustomerStatus = CustomerStatus.ACTIVE
+
+
+class CustomerUpdate(ORMModel):
+    full_name: str | None = Field(default=None, min_length=1, max_length=255)
+    email: EmailStr | None = None
+    phone: str | None = Field(default=None, max_length=32)
+    kyc_status: KycStatus | None = None
+    risk_tier: RiskTier | None = None
+    status: CustomerStatus | None = None
+
+
 class CustomerSearchParams(ORMModel):
     q: str | None = Field(default=None, max_length=100)
+    status: CustomerStatus | None = None
+    risk_tier: RiskTier | None = None
+    kyc_status: KycStatus | None = None
+    sort: CustomerSortField = "-created_at"
     limit: int = Field(default=25, ge=1, le=200)
     cursor: str | None = None
