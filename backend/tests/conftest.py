@@ -62,7 +62,15 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 
 @pytest_asyncio.fixture
 async def make_role(db_session: AsyncSession):
+    from sqlalchemy import select
+
     async def _make(name: str = "analyst", permissions: dict | None = None) -> Role:
+        result = await db_session.execute(
+            select(Role).where(Role.name == name, Role.deleted_at.is_(None))
+        )
+        role = result.scalar_one_or_none()
+        if role is not None:
+            return role
         role = Role(name=name, permissions=permissions or {})
         db_session.add(role)
         await db_session.flush()
@@ -107,3 +115,46 @@ async def make_customer(db_session: AsyncSession):
         return customer
 
     return _make
+
+
+@pytest_asyncio.fixture
+async def make_account(db_session: AsyncSession, make_customer):
+    from app.models.account import Account
+
+    async def _make(*, customer_id=None, **kwargs) -> Account:
+        if customer_id is None:
+            customer = await make_customer()
+            customer_id = customer.id
+        account = Account(customer_id=customer_id, **kwargs)
+        if "account_type" not in kwargs:
+            account.account_type = "checking"
+        if "masked_number" not in kwargs:
+            account.masked_number = "**** 4471"
+        db_session.add(account)
+        await db_session.flush()
+        return account
+
+    return _make
+
+
+@pytest_asyncio.fixture
+async def make_transaction(db_session: AsyncSession, make_account):
+    from app.models.transaction import Transaction
+
+    async def _make(*, account_id=None, **kwargs) -> Transaction:
+        if account_id is None:
+            account = await make_account()
+            account_id = account.id
+        txn = Transaction(account_id=account_id, **kwargs)
+        if "amount_cents" not in kwargs:
+            txn.amount_cents = 10_000
+        if "direction" not in kwargs:
+            txn.direction = "debit"
+        if "channel" not in kwargs:
+            txn.channel = "card"
+        db_session.add(txn)
+        await db_session.flush()
+        return txn
+
+    return _make
+

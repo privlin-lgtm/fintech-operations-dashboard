@@ -103,18 +103,30 @@ def get_auth_service(
     return AuthService(user_repo, refresh_token_repo, audit_repo)
 
 
-def get_transaction_service(transaction_repo: TransactionRepoDep) -> TransactionService:
-    return TransactionService(transaction_repo)
+def get_transaction_service(
+    transaction_repo: TransactionRepoDep,
+    audit_repo: AuditLogRepoDep,
+) -> TransactionService:
+    return TransactionService(transaction_repo, audit_repo)
 
 
-def get_case_service(case_repo: CaseRepoDep, audit_repo: AuditLogRepoDep) -> CaseService:
-    return CaseService(case_repo, audit_repo)
+def get_case_service(
+    case_repo: CaseRepoDep,
+    audit_repo: AuditLogRepoDep,
+    customer_repo: CustomerRepoDep,
+    user_repo: UserRepoDep,
+) -> CaseService:
+    return CaseService(case_repo, audit_repo, customer_repo, user_repo)
 
 
 def get_alert_service(
-    alert_repo: AlertRepoDep, case_repo: CaseRepoDep, audit_repo: AuditLogRepoDep
+    alert_repo: AlertRepoDep,
+    case_repo: CaseRepoDep,
+    audit_repo: AuditLogRepoDep,
+    customer_repo: CustomerRepoDep,
+    user_repo: UserRepoDep,
 ) -> AlertService:
-    return AlertService(alert_repo, case_repo, audit_repo)
+    return AlertService(alert_repo, case_repo, audit_repo, customer_repo, user_repo)
 
 
 def get_report_service(

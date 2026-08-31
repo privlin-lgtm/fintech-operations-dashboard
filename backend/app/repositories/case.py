@@ -14,7 +14,12 @@ class CaseRepository(BaseRepository[Case]):
     model = Case
 
     async def get_detail(self, case_id: UUID) -> Case | None:
-        stmt = self._base_query().options(selectinload(Case.notes)).where(Case.id == case_id)
+        stmt = (
+            self._base_query()
+            .options(selectinload(Case.notes))
+            .where(Case.id == case_id)
+            .execution_options(populate_existing=True)
+        )
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 

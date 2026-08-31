@@ -12,6 +12,7 @@ from app.db.mixins import SoftDeleteMixin, TimestampMixin, UUIDPrimaryKeyMixin
 if TYPE_CHECKING:
     from app.models.account import Account
     from app.models.alert import Alert
+    from app.models.case import CaseTransactionLink
 
 
 class Transaction(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
@@ -33,3 +34,6 @@ class Transaction(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
 
     account: Mapped["Account"] = relationship("Account", back_populates="transactions")
     alerts: Mapped[list["Alert"]] = relationship("Alert", back_populates="transaction")
+    case_links: Mapped[list["CaseTransactionLink"]] = relationship(
+        "CaseTransactionLink", back_populates="transaction"
+    )

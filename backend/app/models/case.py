@@ -65,7 +65,7 @@ class CaseTransactionLink(Base):
     )
 
     case: Mapped["Case"] = relationship("Case", back_populates="transaction_links")
-    transaction: Mapped["Transaction"] = relationship("Transaction")
+    transaction: Mapped["Transaction"] = relationship("Transaction", back_populates="case_links")
 
 
 class CaseNote(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):

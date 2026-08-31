@@ -53,9 +53,17 @@ async def test_db_accepts_closed_case_with_resolution(db_session, make_customer)
 async def test_case_service_close_enforces_the_same_rule_end_to_end(
     db_session, make_customer, make_user
 ):
+    from app.repositories.customer import CustomerRepository
+    from app.repositories.user import UserRepository
+
     customer = await make_customer()
-    actor = await make_user()
-    service = CaseService(CaseRepository(db_session), AuditLogRepository(db_session))
+    actor = await make_user(role_name="investigator")
+    service = CaseService(
+        CaseRepository(db_session),
+        AuditLogRepository(db_session),
+        CustomerRepository(db_session),
+        UserRepository(db_session),
+    )
 
     created = await service.create(
         CaseCreate(customer_id=customer.id, case_type="dispute", priority="medium"), actor
@@ -66,10 +74,10 @@ async def test_case_service_close_enforces_the_same_rule_end_to_end(
         CaseClose(
             resolution_code="resolved",
             closing_summary="Closed after review.",
-            status="closed_resolved",
+            status="closed_no_action",
         ),
         actor,
     )
 
-    assert closed.status == "closed_resolved"
+    assert closed.status == "closed_no_action"
     assert closed.closed_at is not None

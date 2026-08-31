@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from app.models.case import Case
     from app.models.customer import Customer
     from app.models.transaction import Transaction
+    from app.models.user import User
 
 
 class Alert(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
@@ -25,6 +26,9 @@ class Alert(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     )
     case_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("cases.id", ondelete="SET NULL"), nullable=True
+    )
+    assignee_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
     alert_type: Mapped[str] = mapped_column("type", Text, nullable=False)
     severity: Mapped[str] = mapped_column(Text, nullable=False)
@@ -40,3 +44,4 @@ class Alert(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
         "Transaction", back_populates="alerts"
     )
     case: Mapped["Case | None"] = relationship("Case", back_populates="alerts")
+    assignee: Mapped["User | None"] = relationship("User", foreign_keys=[assignee_id])

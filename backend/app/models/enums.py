@@ -92,9 +92,9 @@ class AlertSeverity(StrEnum):
 
 class AlertStatus(StrEnum):
     NEW = "new"
-    UNDER_REVIEW = "under_review"
+    ASSIGNED = "assigned"
     ESCALATED = "escalated"
-    DISMISSED = "dismissed"
+    RESOLVED = "resolved"
 
 
 class ReportType(StrEnum):

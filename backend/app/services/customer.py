@@ -3,6 +3,7 @@ from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
 
+from app.core.alert_permissions import OPEN_ALERT_STATUSES
 from app.core.exceptions import ConflictError, NotFoundError
 from app.core.pagination import decode_cursor, paginate
 from app.core.sorting import decode_sort_cursor, paginate_sorted
@@ -30,7 +31,6 @@ from app.services.alert import AlertService
 from app.services.case import CaseService
 
 RECENT_PREVIEW_LIMIT = 5
-OPEN_ALERT_STATUSES = ("new", "under_review")
 
 
 class CustomerService:
