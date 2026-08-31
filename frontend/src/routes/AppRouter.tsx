@@ -5,6 +5,8 @@ import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage'
 import { LoginPage } from '@/pages/auth/LoginPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { PlaceholderPage } from '@/pages/PlaceholderPage'
+import { CustomersPage } from '@/pages/customers/CustomersPage'
+import { CustomerDetailPage } from '@/pages/customers/CustomerDetailPage'
 import { GuestRoute } from '@/routes/GuestRoute'
 import { ProtectedRoute } from '@/routes/ProtectedRoute'
 
@@ -24,15 +26,8 @@ export const router = createBrowserRouter([
         element: <AppLayout />,
         children: [
           { index: true, element: <DashboardPage /> },
-          {
-            path: 'customers',
-            element: (
-              <PlaceholderPage
-                title="Customers"
-                description="Search, filter, and manage customer profiles."
-              />
-            ),
-          },
+          { path: 'customers', element: <CustomersPage /> },
+          { path: 'customers/:customerId', element: <CustomerDetailPage /> },
           {
             path: 'transactions',
             element: (
