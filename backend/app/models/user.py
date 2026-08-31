@@ -30,6 +30,13 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     # a previously-issued token can be invalidated on the next request instead
     # of waiting out its remaining lifetime (up to jwt_access_token_expire_minutes).
     token_version: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0, server_default="0")
+    # Login lockout: consecutive failures since the last success, and how long
+    # the account stays locked once the threshold is crossed (exponential
+    # backoff — see core/config.py's login_lockout_* settings).
+    failed_login_attempts: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=0, server_default="0"
+    )
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(
         Text,
         nullable=False,

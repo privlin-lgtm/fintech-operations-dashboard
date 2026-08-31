@@ -1,5 +1,6 @@
 import pyotp
 import pytest
+from cryptography.fernet import Fernet
 from pydantic import ValidationError
 
 from app.core.config import Settings
@@ -98,8 +99,20 @@ def test_production_env_rejects_debug_true():
         Settings(app_env="production", debug=True, jwt_secret_key="a-real-random-secret-value-not-default")
 
 
+def test_production_env_rejects_default_encryption_key():
+    with pytest.raises(ValidationError):
+        Settings(
+            app_env="production",
+            debug=False,
+            jwt_secret_key="a-real-random-secret-value-not-default",
+        )
+
+
 def test_production_env_accepts_real_secret_and_debug_off():
     settings = Settings(
-        app_env="production", debug=False, jwt_secret_key="a-real-random-secret-value-not-default"
+        app_env="production",
+        debug=False,
+        jwt_secret_key="a-real-random-secret-value-not-default",
+        encryption_key=Fernet.generate_key().decode(),
     )
     assert settings.app_env == "production"

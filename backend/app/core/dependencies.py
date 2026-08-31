@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends
+from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -49,8 +49,12 @@ def get_refresh_token_repository(session: SessionDep) -> RefreshTokenRepository:
     return RefreshTokenRepository(session)
 
 
-def get_audit_log_repository(session: SessionDep) -> AuditLogRepository:
-    return AuditLogRepository(session)
+def get_audit_log_repository(session: SessionDep, request: Request) -> AuditLogRepository:
+    # Captured once here so every _audit()/record() call anywhere in the
+    # request gets a real IP address without every service method needing to
+    # accept and thread through a Request object.
+    client_host = request.client.host if request.client else None
+    return AuditLogRepository(session, ip_address=client_host)
 
 
 def get_customer_repository(session: SessionDep) -> CustomerRepository:
@@ -169,25 +173,43 @@ CustomerServiceDep = Annotated[CustomerService, Depends(get_customer_service)]
 
 
 async def get_current_user(
+    request: Request,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
     user_repo: UserRepoDep,
+    audit_repo: AuditLogRepoDep,
 ) -> User:
+    async def _deny(message: str, *, actor_id: UUID | None = None) -> None:
+        # Every rejection here is logged — this is the one place a probing or
+        # replay attempt against an invalid/expired/revoked token would
+        # otherwise leave zero trace anywhere in the system.
+        await audit_repo.record(
+            actor_id=actor_id,
+            action="access_denied",
+            resource_type="auth",
+            resource_id=actor_id or UUID(int=0),
+            metadata={"reason": message, "path": request.url.path},
+        )
+
     if credentials is None or credentials.scheme.lower() != "bearer":
+        await _deny("not_authenticated")
         raise AuthenticationError("Not authenticated")
 
     try:
         payload = verify_token(credentials.credentials, expected_type="access")
         user_id = UUID(payload["sub"])
     except (ValueError, KeyError) as exc:
+        await _deny("invalid_or_expired_token")
         raise AuthenticationError("Invalid or expired token") from exc
 
     user = await user_repo.get_active_by_id(user_id)
     if user is None:
+        await _deny("user_not_found_or_inactive", actor_id=user_id)
         raise AuthenticationError("User not found or inactive")
 
     # Bumped on logout — a token minted before that point stops working on
     # the very next request instead of riding out its remaining lifetime.
     if payload.get("tv") != user.token_version:
+        await _deny("session_invalidated", actor_id=user.id)
         raise AuthenticationError("Session has been invalidated, please log in again")
 
     return user
@@ -197,8 +219,24 @@ CurrentUserDep = Annotated[User, Depends(get_current_user)]
 
 
 def require_roles(*allowed_roles: str):
-    async def _checker(current_user: CurrentUserDep) -> User:
+    async def _checker(
+        request: Request,
+        current_user: CurrentUserDep,
+        audit_repo: AuditLogRepoDep,
+    ) -> User:
         if current_user.role.name not in allowed_roles:
+            await audit_repo.record(
+                actor_id=current_user.id,
+                action="access_denied",
+                resource_type="auth",
+                resource_id=current_user.id,
+                metadata={
+                    "reason": "insufficient_role",
+                    "path": request.url.path,
+                    "actual_role": current_user.role.name,
+                    "required_roles": list(allowed_roles),
+                },
+            )
             raise AuthorizationError("Insufficient permissions")
         return current_user
 

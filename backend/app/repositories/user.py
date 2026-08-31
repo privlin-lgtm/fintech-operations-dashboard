@@ -1,11 +1,14 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from app.core.config import get_settings
 from app.models.user import User
 from app.repositories.base import BaseRepository
+
+settings = get_settings()
 
 
 class UserRepository(BaseRepository[User]):
@@ -46,3 +49,24 @@ class UserRepository(BaseRepository[User]):
         await self.session.flush()
         await self.session.refresh(user)
         return user
+
+    async def record_failed_login(self, user: User) -> None:
+        """Exponential backoff once the threshold is crossed: base * 2^(n -
+        threshold), capped — a few failures behave normally, sustained
+        guessing gets slower with every additional attempt instead of a flat
+        lockout window an attacker can just wait out."""
+        user.failed_login_attempts += 1
+        if user.failed_login_attempts >= settings.login_lockout_threshold:
+            overage = user.failed_login_attempts - settings.login_lockout_threshold
+            delay = min(
+                settings.login_lockout_base_seconds * (2**overage),
+                settings.login_lockout_max_seconds,
+            )
+            user.locked_until = datetime.now(UTC) + timedelta(seconds=delay)
+        await self.session.flush()
+
+    async def reset_failed_login(self, user: User) -> None:
+        if user.failed_login_attempts or user.locked_until:
+            user.failed_login_attempts = 0
+            user.locked_until = None
+            await self.session.flush()

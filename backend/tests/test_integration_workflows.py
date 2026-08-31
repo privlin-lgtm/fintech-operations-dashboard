@@ -48,17 +48,15 @@ async def test_auth_session_lifecycle(client, ops_team):
     assert me.json()["email"] == analyst.email
     assert me.json()["role"]["name"] == "analyst"
 
-    refreshed = await client.post(
-        "/api/v1/auth/refresh",
-        json={"refresh_token": tokens["refresh_token"]},
-    )
+    old_refresh_cookie = client.cookies.get("refresh_token")
+
+    refreshed = await client.post("/api/v1/auth/refresh")
     assert refreshed.status_code == 200
     new_tokens = refreshed.json()
-    assert new_tokens["refresh_token"] != tokens["refresh_token"]
+    assert client.cookies.get("refresh_token") != old_refresh_cookie
 
     logout = await client.post(
         "/api/v1/auth/logout",
-        json={"refresh_token": new_tokens["refresh_token"]},
         headers=auth_headers_from_tokens(new_tokens),
     )
     assert logout.status_code == 204

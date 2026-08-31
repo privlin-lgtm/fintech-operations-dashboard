@@ -8,17 +8,12 @@ class LoginRequest(BaseModel):
 
 
 class TokenResponse(BaseModel):
+    """The refresh token is deliberately not a field here — it only ever
+    travels as an httpOnly cookie (see endpoints/auth.py), never in a body
+    JavaScript could read."""
+
     access_token: str
-    refresh_token: str
     token_type: str = "bearer"
-
-
-class RefreshTokenRequest(BaseModel):
-    refresh_token: str
-
-
-class LogoutRequest(BaseModel):
-    refresh_token: str
 
 
 class TokenPayload(BaseModel):

@@ -1,8 +1,13 @@
+import logging
+import time
+import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from app.api.v1.router import api_router
 from app.core.config import get_settings
@@ -14,14 +19,18 @@ from app.core.exceptions import (
     NotFoundError,
     ValidationConflictError,
 )
+from app.core.logging import configure_logging
+from app.core.rate_limit import limiter
 from app.db.session import engine
 from app.schemas.base import ProblemDetail
 
 settings = get_settings()
+logger = logging.getLogger("app.request")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    configure_logging(debug=settings.debug)
     yield
     await engine.dispose()
 
@@ -53,13 +62,37 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    app.state.limiter = limiter
+    app.add_middleware(SlowAPIMiddleware)
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
+        # Needed for the httpOnly refresh-token cookie to be sent/received
+        # cross-origin — this app has no other cookie-based auth surface.
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PATCH", "DELETE"],
+        allow_headers=["Authorization", "Content-Type", "Accept"],
     )
+
+    @app.middleware("http")
+    async def request_context(request: Request, call_next):
+        request_id = str(uuid.uuid4())
+        start = time.perf_counter()
+        response = await call_next(request)
+        duration_ms = round((time.perf_counter() - start) * 1000, 1)
+        response.headers["X-Request-ID"] = request_id
+        logger.info(
+            "request_completed",
+            extra={
+                "request_id": request_id,
+                "path": request.url.path,
+                "method": request.method,
+                "status_code": response.status_code,
+                "duration_ms": duration_ms,
+            },
+        )
+        return response
 
     app.include_router(api_router, prefix=settings.api_v1_prefix)
 
@@ -106,6 +139,36 @@ def create_app() -> FastAPI:
     async def handle_authorization_error(request: Request, exc: AuthorizationError) -> JSONResponse:
         return _problem_response(
             request, status_code=403, title="Forbidden", detail=exc.message
+        )
+
+    @app.exception_handler(RateLimitExceeded)
+    async def handle_rate_limit_exceeded(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+        logger.warning(
+            "rate_limit_exceeded",
+            extra={"path": request.url.path, "method": request.method},
+        )
+        response = _problem_response(
+            request,
+            status_code=429,
+            title="Too many requests",
+            detail="Too many attempts — please wait before trying again.",
+        )
+        return limiter._inject_headers(response, request.state.view_rate_limit)
+
+    @app.exception_handler(Exception)
+    async def handle_unexpected_exception(request: Request, exc: Exception) -> JSONResponse:
+        # The one place a truly unanticipated failure gets captured — without
+        # this, an unhandled exception in production has no durable record
+        # beyond whatever the process's stdout happens to be attached to.
+        logger.exception(
+            "unhandled_exception",
+            extra={"path": request.url.path, "method": request.method},
+        )
+        return _problem_response(
+            request,
+            status_code=500,
+            title="Internal server error",
+            detail="An unexpected error occurred. This has been logged.",
         )
 
     @app.get("/health", tags=["health"])

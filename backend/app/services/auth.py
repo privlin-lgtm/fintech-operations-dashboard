@@ -1,9 +1,11 @@
+from datetime import UTC, datetime
 from uuid import UUID
 
 from app.core.exceptions import AuthenticationError
 from app.core.security import (
     create_access_token,
     create_refresh_token,
+    decrypt_mfa_secret,
     hash_token,
     verify_mfa_code,
     verify_password,
@@ -35,7 +37,21 @@ class AuthService:
     async def authenticate(self, credentials: LoginRequest) -> User:
         user = await self.user_repo.get_by_email(credentials.email)
 
+        if user is not None and user.locked_until and user.locked_until > datetime.now(UTC):
+            await self.audit_repo.record(
+                actor_id=user.id,
+                action="login_failed",
+                resource_type="user",
+                resource_id=user.id,
+                metadata={"reason": "account_locked"},
+            )
+            raise AuthenticationError(
+                "Too many failed attempts — try again in a few minutes"
+            )
+
         if user is None or not verify_password(credentials.password, user.hashed_password):
+            if user is not None:
+                await self.user_repo.record_failed_login(user)
             await self.audit_repo.record(
                 actor_id=user.id if user else None,
                 action="login_failed",
@@ -51,7 +67,9 @@ class AuthService:
         if user.mfa_enabled:
             if not credentials.mfa_code:
                 raise AuthenticationError("MFA code required")
-            if not verify_mfa_code(user.mfa_secret or "", credentials.mfa_code):
+            plain_secret = decrypt_mfa_secret(user.mfa_secret) if user.mfa_secret else ""
+            if not verify_mfa_code(plain_secret, credentials.mfa_code):
+                await self.user_repo.record_failed_login(user)
                 await self.audit_repo.record(
                     actor_id=user.id,
                     action="login_failed",
@@ -61,18 +79,22 @@ class AuthService:
                 )
                 raise AuthenticationError("Invalid MFA code")
 
+        await self.user_repo.reset_failed_login(user)
         return user
 
-    async def login(self, credentials: LoginRequest) -> TokenResponse:
+    async def login(self, credentials: LoginRequest) -> tuple[TokenResponse, str, datetime]:
         user = await self.authenticate(credentials)
         await self.user_repo.update_last_login(user)
-        response = await self._issue_tokens(user)
+        response, refresh_token, expires_at = await self._issue_tokens(user)
         await self.audit_repo.record(
             actor_id=user.id, action="login", resource_type="user", resource_id=user.id
         )
-        return response
+        return response, refresh_token, expires_at
 
-    async def refresh(self, refresh_token: str) -> TokenResponse:
+    async def refresh(self, refresh_token: str | None) -> tuple[TokenResponse, str, datetime]:
+        if not refresh_token:
+            raise AuthenticationError("No refresh token supplied")
+
         try:
             payload = verify_token(refresh_token, expected_type="refresh")
         except ValueError as exc:
@@ -92,10 +114,11 @@ class AuthService:
         await self.refresh_token_repo.revoke(stored)
         return await self._issue_tokens(user)
 
-    async def logout(self, refresh_token: str, actor: User) -> None:
-        stored = await self.refresh_token_repo.get_by_hash(hash_token(refresh_token))
-        if stored is not None and stored.user_id == actor.id:
-            await self.refresh_token_repo.revoke(stored)
+    async def logout(self, refresh_token: str | None, actor: User) -> None:
+        if refresh_token:
+            stored = await self.refresh_token_repo.get_by_hash(hash_token(refresh_token))
+            if stored is not None and stored.user_id == actor.id:
+                await self.refresh_token_repo.revoke(stored)
 
         # Bumping token_version invalidates every access token already issued
         # to this user, not just the one on this request — logout means
@@ -105,7 +128,7 @@ class AuthService:
             actor_id=actor.id, action="logout", resource_type="user", resource_id=actor.id
         )
 
-    async def _issue_tokens(self, user: User) -> TokenResponse:
+    async def _issue_tokens(self, user: User) -> tuple[TokenResponse, str, datetime]:
         claims = {"role": user.role.name, "tv": user.token_version}
         access_token = create_access_token(user.id, extra_claims=claims)
         refresh_token, _jti, expires_at = create_refresh_token(user.id)
@@ -116,4 +139,6 @@ class AuthService:
                 expires_at=expires_at,
             )
         )
-        return TokenResponse(access_token=access_token, refresh_token=refresh_token)
+        # The refresh token never appears in the JSON body — the endpoint
+        # sets it as an httpOnly cookie instead, so it's out of JS's reach.
+        return TokenResponse(access_token=access_token), refresh_token, expires_at

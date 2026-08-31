@@ -1,12 +1,21 @@
 from typing import Any
 from uuid import UUID
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models.audit_log import AuditLog
 from app.repositories.base import BaseRepository
 
 
 class AuditLogRepository(BaseRepository[AuditLog]):
     model = AuditLog
+
+    def __init__(self, session: AsyncSession, *, ip_address: str | None = None) -> None:
+        super().__init__(session)
+        # Captured once per request (see core/dependencies.get_audit_log_repository)
+        # so every record() call in a request gets it without threading a
+        # Request object through every service method.
+        self.ip_address = ip_address
 
     async def record(
         self,
@@ -24,6 +33,6 @@ class AuditLogRepository(BaseRepository[AuditLog]):
             resource_type=resource_type,
             resource_id=resource_id,
             log_metadata=metadata or {},
-            ip_address=ip_address,
+            ip_address=ip_address or self.ip_address,
         )
         return await self.add(entry)

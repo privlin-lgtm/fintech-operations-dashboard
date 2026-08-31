@@ -5,6 +5,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import pyotp
+from cryptography.fernet import Fernet, InvalidToken
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
@@ -15,6 +16,8 @@ settings = get_settings()
 pwd_context = CryptContext(
     schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=settings.bcrypt_rounds
 )
+
+_fernet = Fernet(settings.encryption_key.encode())
 
 
 def hash_password(plain_password: str) -> str:
@@ -105,9 +108,25 @@ def verify_token(token: str, *, expected_type: str = "access") -> dict[str, Any]
 
 
 def generate_mfa_secret() -> str:
-    """A base32 TOTP secret for enrollment. No enrollment endpoint exists yet —
-    this is here so adding one later doesn't require touching this module."""
+    """A plaintext base32 TOTP secret for enrollment — shown to the user once
+    (e.g. as a QR code) and then only ever stored via encrypt_mfa_secret().
+    No enrollment endpoint exists yet; this is here so adding one later
+    doesn't require touching this module."""
     return pyotp.random_base32()
+
+
+def encrypt_mfa_secret(plain_secret: str) -> str:
+    """What actually gets written to users.mfa_secret — the raw TOTP seed is
+    never persisted. Fernet (AES-128-CBC + HMAC) with a key separate from
+    jwt_secret_key, so rotating one doesn't force rotating the other."""
+    return _fernet.encrypt(plain_secret.encode()).decode()
+
+
+def decrypt_mfa_secret(encrypted_secret: str) -> str:
+    try:
+        return _fernet.decrypt(encrypted_secret.encode()).decode()
+    except InvalidToken as exc:
+        raise ValueError("MFA secret could not be decrypted") from exc
 
 
 def verify_mfa_code(secret: str, code: str) -> bool:

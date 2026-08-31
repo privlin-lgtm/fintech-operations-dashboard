@@ -15,8 +15,9 @@ async def test_login_succeeds_with_correct_credentials(client, make_user):
     assert response.status_code == 200
     body = response.json()
     assert body["access_token"]
-    assert body["refresh_token"]
     assert body["token_type"] == "bearer"
+    assert "refresh_token" not in body
+    assert client.cookies.get("refresh_token") is not None
 
 
 async def test_login_rejects_wrong_password(client, make_user):
@@ -107,20 +108,26 @@ async def test_mfa_enabled_user_logs_in_with_correct_code(client, make_user):
 
 async def test_refresh_rotates_token_and_old_one_becomes_unusable(client, make_user):
     await make_user(email="ava@example.com", password="correct-horse-battery")
-    login = await client.post(
+    await client.post(
         "/api/v1/auth/login",
         json={"email": "ava@example.com", "password": "correct-horse-battery"},
     )
-    old_refresh = login.json()["refresh_token"]
+    old_refresh = client.cookies.get("refresh_token")
 
-    first_refresh = await client.post("/api/v1/auth/refresh", json={"refresh_token": old_refresh})
+    first_refresh = await client.post("/api/v1/auth/refresh")
     assert first_refresh.status_code == 200
-    assert first_refresh.json()["refresh_token"] != old_refresh
+    assert client.cookies.get("refresh_token") != old_refresh
 
     # Replaying the now-rotated-out token must fail — this is what makes a
     # stolen-and-replayed refresh token detectable instead of silently working.
-    reuse_attempt = await client.post("/api/v1/auth/refresh", json={"refresh_token": old_refresh})
+    client.cookies.set("refresh_token", old_refresh, path="/api/v1/auth")
+    reuse_attempt = await client.post("/api/v1/auth/refresh")
     assert reuse_attempt.status_code == 401
+
+
+async def test_refresh_without_cookie_is_rejected(client):
+    response = await client.post("/api/v1/auth/refresh")
+    assert response.status_code == 401
 
 
 async def test_logout_invalidates_the_access_token_immediately(client, make_user):
@@ -129,18 +136,15 @@ async def test_logout_invalidates_the_access_token_immediately(client, make_user
         "/api/v1/auth/login",
         json={"email": "ava@example.com", "password": "correct-horse-battery"},
     )
-    tokens = login.json()
-    headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+    access_token = login.json()["access_token"]
+    headers = {"Authorization": f"Bearer {access_token}"}
 
     me_before = await client.get("/api/v1/auth/me", headers=headers)
     assert me_before.status_code == 200
 
-    logout = await client.post(
-        "/api/v1/auth/logout",
-        json={"refresh_token": tokens["refresh_token"]},
-        headers=headers,
-    )
+    logout = await client.post("/api/v1/auth/logout", headers=headers)
     assert logout.status_code == 204
+    assert client.cookies.get("refresh_token") is None
 
     # Same access token, still within its 30-minute expiry — but token_version
     # was bumped, so it must be rejected on the very next request.

@@ -13,6 +13,7 @@ dependencies = [
     "pydantic[email]>=2.10.0",
     "pydantic-settings>=2.6.0",
     "python-jose[cryptography]>=3.3.0",
+    "cryptography>=43.0.0",
     "passlib[bcrypt]>=1.7.4",
     # passlib's bcrypt backend detection reads bcrypt.__about__, which bcrypt
     # removed in 4.1 — pin below that until passlib ships a fix.
@@ -20,6 +21,7 @@ dependencies = [
     "python-multipart>=0.0.18",
     "pyotp>=2.9.0",
     "reportlab>=4.2.0",
+    "slowapi>=0.1.9",
 ]
 
 [project.optional-dependencies]

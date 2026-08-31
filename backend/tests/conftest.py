@@ -11,7 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from app.core.config import get_settings
 from app.core.dependencies import get_session
-from app.core.security import hash_password
+from app.core.rate_limit import limiter
+from app.core.security import encrypt_mfa_secret, hash_password
 from app.main import create_app
 from app.models.customer import Customer
 from app.models.role import Role
@@ -46,6 +47,12 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 
 @pytest_asyncio.fixture
 async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+    # The rate limiter's in-memory storage is a module-level singleton shared
+    # across the whole test process; every test client also shares the same
+    # source IP (127.0.0.1), so without a reset here, login attempts made by
+    # earlier tests would count against later ones' rate limit.
+    limiter.reset()
+
     app = create_app()
 
     async def _override_get_session() -> AsyncGenerator[AsyncSession, None]:
@@ -96,7 +103,7 @@ async def make_user(db_session: AsyncSession, make_role):
             full_name="Test User",
             hashed_password=hash_password(password),
             mfa_enabled=mfa_enabled,
-            mfa_secret=mfa_secret,
+            mfa_secret=encrypt_mfa_secret(mfa_secret) if mfa_secret else None,
         )
         db_session.add(user)
         await db_session.flush()

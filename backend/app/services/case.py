@@ -5,6 +5,7 @@ from app.core.case_permissions import (
     CLOSED_STATUSES,
     enforce_assign,
     enforce_close,
+    enforce_create_owner,
     enforce_modify,
     enforce_note,
     enforce_reassign,
@@ -60,6 +61,7 @@ class CaseService:
         if customer is None:
             raise NotFoundError("customer", data.customer_id)
 
+        enforce_create_owner(actor, data.owner_id)
         owner_id = data.owner_id or actor.id
         if data.owner_id:
             await self._ensure_active_user(data.owner_id)

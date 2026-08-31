@@ -8,13 +8,24 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+_FORMULA_TRIGGER_CHARS = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _escape_csv_formula(value: Any) -> Any:
+    """Neutralize CSV/formula injection: a leading =, +, -, @ (or tab/CR) is
+    interpreted as a formula by Excel/Sheets when the file is opened, so
+    prefix such values with a literal-text marker."""
+    if isinstance(value, str) and value.startswith(_FORMULA_TRIGGER_CHARS):
+        return "'" + value
+    return value
+
 
 def rows_to_csv(rows: list[dict[str, Any]], fieldnames: list[str]) -> StreamingResponse:
     buffer = io.StringIO()
     writer = csv.DictWriter(buffer, fieldnames=fieldnames, extrasaction="ignore")
     writer.writeheader()
     for row in rows:
-        writer.writerow({key: row.get(key) for key in fieldnames})
+        writer.writerow({key: _escape_csv_formula(row.get(key)) for key in fieldnames})
     buffer.seek(0)
     return StreamingResponse(
         iter([buffer.getvalue()]),

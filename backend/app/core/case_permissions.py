@@ -8,6 +8,8 @@ Role matrix (simplified for v1):
 - admin: full case operations
 """
 
+from uuid import UUID
+
 from app.core.exceptions import AuthorizationError
 from app.models.case import Case
 from app.models.user import User
@@ -77,6 +79,22 @@ def can_reassign_case(user: User) -> bool:
     return user.role.name in CASE_REASSIGN_ROLES
 
 
+def can_set_owner_on_create(user: User, owner_id: UUID | None) -> bool:
+    """Mirrors can_assign_case's intent for the create path, where there is no
+    existing Case row yet to check ownership against: an analyst/investigator
+    may only hand a new case to themselves (or leave it unassigned), the same
+    ceiling can_assign_case imposes on an unowned case; only a team_lead/admin
+    may hand it to someone else outright."""
+    if owner_id is None:
+        return True
+    role = user.role.name
+    if role in ("team_lead", "admin"):
+        return True
+    if role in ("investigator", "analyst"):
+        return owner_id == user.id
+    return False
+
+
 def enforce_view(user: User, case: Case) -> None:
     if not can_view_case(user, case):
         raise AuthorizationError("You do not have permission to view this case")
@@ -105,3 +123,8 @@ def enforce_assign(user: User, case: Case) -> None:
 def enforce_reassign(user: User) -> None:
     if not can_reassign_case(user):
         raise AuthorizationError("Only team leads and admins may reassign cases")
+
+
+def enforce_create_owner(user: User, owner_id: UUID | None) -> None:
+    if not can_set_owner_on_create(user, owner_id):
+        raise AuthorizationError("You do not have permission to assign this case to that owner")

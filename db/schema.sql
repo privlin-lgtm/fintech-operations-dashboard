@@ -53,10 +53,12 @@ create table users (
     full_name        text not null,
     hashed_password  text not null,
     mfa_enabled      boolean not null default false,
-    mfa_secret       text,   -- base32 TOTP secret; null until the user enrolls
+    mfa_secret       text,   -- Fernet-encrypted base32 TOTP secret; null until the user enrolls
     token_version    bigint not null default 0,   -- bumped to invalidate outstanding access tokens
     status           text not null default 'active'
                          check (status in ('active', 'deactivated')),
+    failed_login_attempts bigint not null default 0,  -- reset on success; drives exponential lockout backoff
+    locked_until     timestamptz,   -- null unless currently locked out from repeated failed logins
     last_login_at    timestamptz,
     created_at       timestamptz not null default now(),
     updated_at       timestamptz not null default now(),
