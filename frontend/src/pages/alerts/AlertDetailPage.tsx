@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { Badge, riskTierTone } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
+import { AlertActionsPanel } from '@/features/alerts/components/AlertActionsPanel'
 import { useAlertDetail } from '@/features/alerts/hooks/useAlertSearch'
 import { formatDateTime, formatLabel } from '@/lib/format'
 
@@ -111,6 +112,8 @@ export function AlertDetailPage() {
           </div>
         </dl>
       </Card>
+
+      <AlertActionsPanel alert={alert} />
     </div>
   )
 }

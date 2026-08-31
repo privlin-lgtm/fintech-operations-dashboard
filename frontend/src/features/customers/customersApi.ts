@@ -1,12 +1,7 @@
 import { apiRequest } from '@/lib/api'
 import { buildQueryString } from '@/lib/format'
-import { getAccessToken } from '@/lib/storage'
 import type { PaginatedResponse } from '@/types/api'
 import type { Customer, CustomerProfile, CustomerSearchParams } from '@/types/customer'
-
-function authHeaders() {
-  return { token: getAccessToken() }
-}
 
 export async function searchCustomers(
   params: CustomerSearchParams,
@@ -21,9 +16,9 @@ export async function searchCustomers(
     cursor: params.cursor,
   })
 
-  return apiRequest<PaginatedResponse<Customer>>(`/customers${query}`, authHeaders())
+  return apiRequest<PaginatedResponse<Customer>>(`/customers${query}`)
 }
 
 export async function fetchCustomerProfile(customerId: string): Promise<CustomerProfile> {
-  return apiRequest<CustomerProfile>(`/customers/${customerId}`, authHeaders())
+  return apiRequest<CustomerProfile>(`/customers/${customerId}`)
 }

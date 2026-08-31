@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { skipToken, useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 
 import {
@@ -6,6 +6,7 @@ import {
   parseTransactionSearchParams,
   searchTransactions,
 } from '@/features/transactions/transactionsApi'
+import { transactionKeys } from '@/lib/queryKeys'
 
 export const TRANSACTION_PAGE_SIZE = 25
 
@@ -14,15 +15,14 @@ export function useTransactionSearch() {
   const filters = parseTransactionSearchParams(searchParams)
 
   return useQuery({
-    queryKey: ['transactions', 'search', filters],
+    queryKey: transactionKeys.list(filters),
     queryFn: () => searchTransactions(filters),
   })
 }
 
 export function useTransactionDetail(transactionId: string | undefined) {
   return useQuery({
-    queryKey: ['transactions', 'detail', transactionId],
-    queryFn: () => fetchTransactionDetail(transactionId!),
-    enabled: Boolean(transactionId),
+    queryKey: transactionKeys.detail(transactionId ?? ''),
+    queryFn: transactionId ? () => fetchTransactionDetail(transactionId) : skipToken,
   })
 }

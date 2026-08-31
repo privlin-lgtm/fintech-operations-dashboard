@@ -6,17 +6,17 @@ export async function login(credentials: LoginCredentials): Promise<TokenRespons
   return apiRequest<TokenResponse>('/auth/login', {
     method: 'POST',
     body: credentials,
+    skipAuth: true,
   })
 }
 
-export async function fetchCurrentUser(token: string): Promise<User> {
-  return apiRequest<User>('/auth/me', { token })
+export async function fetchCurrentUser(): Promise<User> {
+  return apiRequest<User>('/auth/me')
 }
 
-export async function logout(refreshToken: string, accessToken: string): Promise<void> {
+export async function logout(refreshToken: string): Promise<void> {
   await apiRequest<void>('/auth/logout', {
     method: 'POST',
-    token: accessToken,
     body: { refresh_token: refreshToken },
   })
 }

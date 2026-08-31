@@ -5,8 +5,12 @@ import { useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
+import { parseEnumParam } from '@/lib/format'
 import type { CaseSearchFormValues } from '@/types/case'
 import { CASE_PRIORITY_OPTIONS, CASE_STATUS_OPTIONS } from '@/types/case'
+
+const STATUS_VALUES = CASE_STATUS_OPTIONS.map((option) => option.value)
+const PRIORITY_VALUES = CASE_PRIORITY_OPTIONS.map((option) => option.value)
 
 type CaseSearchFormProps = {
   onSubmit: (values: CaseSearchFormValues) => void
@@ -14,8 +18,8 @@ type CaseSearchFormProps = {
 
 function formValuesFromParams(searchParams: URLSearchParams): CaseSearchFormValues {
   return {
-    status: (searchParams.get('status') as CaseSearchFormValues['status']) ?? '',
-    priority: (searchParams.get('priority') as CaseSearchFormValues['priority']) ?? '',
+    status: parseEnumParam(searchParams.get('status'), STATUS_VALUES) ?? '',
+    priority: parseEnumParam(searchParams.get('priority'), PRIORITY_VALUES) ?? '',
     assignee: searchParams.get('assignee') ?? '',
     sla_risk: searchParams.get('sla_risk') === 'true',
   }

@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import type { SelectHTMLAttributes } from 'react'
 
 type SelectOption = {
@@ -12,7 +13,8 @@ type SelectProps = SelectHTMLAttributes<HTMLSelectElement> & {
 }
 
 export function Select({ label, options, error, id, className = '', ...props }: SelectProps) {
-  const selectId = id ?? label.toLowerCase().replace(/\s+/g, '-')
+  const generatedId = useId()
+  const selectId = id ?? generatedId
 
   return (
     <div className="space-y-1.5">

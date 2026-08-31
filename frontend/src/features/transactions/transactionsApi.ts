@@ -1,19 +1,18 @@
 import { apiRequest } from '@/lib/api'
-import { buildQueryString, dateInputToIso, dateInputToIsoEnd } from '@/lib/format'
-import { getAccessToken } from '@/lib/storage'
+import { buildQueryString, dateInputToIso, dateInputToIsoEnd, parseEnumParam } from '@/lib/format'
 import type { PaginatedResponse } from '@/types/api'
-import type {
-  TransactionChannel,
-  TransactionDetail,
-  TransactionDirection,
-  TransactionSearchParams,
-  TransactionStatus,
-  Transaction,
+import {
+  TRANSACTION_CHANNEL_OPTIONS,
+  TRANSACTION_DIRECTION_OPTIONS,
+  TRANSACTION_SORT_OPTIONS,
+  TRANSACTION_STATUS_OPTIONS,
 } from '@/types/transaction'
+import type { TransactionDetail, TransactionSearchParams, Transaction } from '@/types/transaction'
 
-function authHeaders() {
-  return { token: getAccessToken() }
-}
+const STATUS_VALUES = TRANSACTION_STATUS_OPTIONS.map((option) => option.value)
+const CHANNEL_VALUES = TRANSACTION_CHANNEL_OPTIONS.map((option) => option.value)
+const DIRECTION_VALUES = TRANSACTION_DIRECTION_OPTIONS.map((option) => option.value)
+const SORT_VALUES = TRANSACTION_SORT_OPTIONS.map((option) => option.value)
 
 export async function searchTransactions(
   params: TransactionSearchParams,
@@ -34,11 +33,11 @@ export async function searchTransactions(
     cursor: params.cursor,
   })
 
-  return apiRequest<PaginatedResponse<Transaction>>(`/transactions${query}`, authHeaders())
+  return apiRequest<PaginatedResponse<Transaction>>(`/transactions${query}`)
 }
 
 export async function fetchTransactionDetail(transactionId: string): Promise<TransactionDetail> {
-  return apiRequest<TransactionDetail>(`/transactions/${transactionId}`, authHeaders())
+  return apiRequest<TransactionDetail>(`/transactions/${transactionId}`)
 }
 
 export function parseTransactionSearchParams(searchParams: URLSearchParams) {
@@ -49,14 +48,14 @@ export function parseTransactionSearchParams(searchParams: URLSearchParams) {
 
   return {
     q: searchParams.get('q') ?? undefined,
-    status: (searchParams.get('status') as TransactionStatus) || undefined,
-    channel: (searchParams.get('channel') as TransactionChannel) || undefined,
-    direction: (searchParams.get('direction') as TransactionDirection) || undefined,
+    status: parseEnumParam(searchParams.get('status'), STATUS_VALUES),
+    channel: parseEnumParam(searchParams.get('channel'), CHANNEL_VALUES),
+    direction: parseEnumParam(searchParams.get('direction'), DIRECTION_VALUES),
     from_date: fromDate ? dateInputToIso(fromDate) : undefined,
     to_date: toDate ? dateInputToIsoEnd(toDate) : undefined,
     min_amount: minAmount ? Number(minAmount) : undefined,
     max_amount: maxAmount ? Number(maxAmount) : undefined,
-    sort: (searchParams.get('sort') as TransactionSearchParams['sort']) ?? '-created_at',
+    sort: parseEnumParam(searchParams.get('sort'), SORT_VALUES) ?? '-created_at',
     cursor: searchParams.get('cursor') ?? undefined,
     limit: 25,
   } satisfies TransactionSearchParams

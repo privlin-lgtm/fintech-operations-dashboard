@@ -1,3 +1,16 @@
+/**
+ * Validates a URL param against a known set of allowed values instead of
+ * blindly `as`-casting it. A hand-edited or bookmarked URL with `?status=bogus`
+ * is silently dropped (falls back to "no filter") rather than trusted as if
+ * it were a real, narrow union value.
+ */
+export function parseEnumParam<T extends string>(
+  value: string | null,
+  allowed: readonly T[],
+): T | undefined {
+  return value !== null && (allowed as readonly string[]).includes(value) ? (value as T) : undefined
+}
+
 export function buildQueryString(params: Record<string, string | number | undefined | null>): string {
   const search = new URLSearchParams()
 

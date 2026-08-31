@@ -51,6 +51,39 @@ export type SlaPerformanceReport = {
   breakdown: SlaBreakdownRow[]
 }
 
+export type ReportCadence = 'once' | 'daily' | 'weekly' | 'monthly'
+
+export type ReportSchedule = {
+  id: string
+  report_type: string
+  filters: Record<string, unknown>
+  cadence: ReportCadence | null
+  recipients: string[]
+  created_by: string
+  last_run_at: string | null
+  next_run_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type ReportScheduleCreateInput = {
+  report_type: ReportType
+  filters?: Record<string, unknown>
+  cadence: ReportCadence
+  recipients: string[]
+}
+
+export type ReportScheduleFormValues = {
+  cadence: ReportCadence
+  recipients: string
+}
+
+export const REPORT_CADENCE_OPTIONS: { label: string; value: ReportCadence }[] = [
+  { label: 'Daily', value: 'daily' },
+  { label: 'Weekly', value: 'weekly' },
+  { label: 'Monthly', value: 'monthly' },
+]
+
 export type ReportSearchParams = {
   from_date?: string
   to_date?: string

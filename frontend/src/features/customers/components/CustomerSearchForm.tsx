@@ -5,6 +5,7 @@ import { useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
+import { parseEnumParam } from '@/lib/format'
 import type { CustomerSearchFormValues } from '@/types/customer'
 import {
   CUSTOMER_SORT_OPTIONS,
@@ -13,6 +14,11 @@ import {
   RISK_TIER_OPTIONS,
 } from '@/types/customer'
 
+const STATUS_VALUES = CUSTOMER_STATUS_OPTIONS.map((option) => option.value)
+const RISK_TIER_VALUES = RISK_TIER_OPTIONS.map((option) => option.value)
+const KYC_STATUS_VALUES = KYC_STATUS_OPTIONS.map((option) => option.value)
+const SORT_VALUES = CUSTOMER_SORT_OPTIONS.map((option) => option.value)
+
 type CustomerSearchFormProps = {
   onSubmit: (values: CustomerSearchFormValues) => void
 }
@@ -20,10 +26,10 @@ type CustomerSearchFormProps = {
 function formValuesFromParams(searchParams: URLSearchParams): CustomerSearchFormValues {
   return {
     q: searchParams.get('q') ?? '',
-    status: (searchParams.get('status') as CustomerSearchFormValues['status']) ?? '',
-    risk_tier: (searchParams.get('risk_tier') as CustomerSearchFormValues['risk_tier']) ?? '',
-    kyc_status: (searchParams.get('kyc_status') as CustomerSearchFormValues['kyc_status']) ?? '',
-    sort: (searchParams.get('sort') as CustomerSearchFormValues['sort']) ?? '-created_at',
+    status: parseEnumParam(searchParams.get('status'), STATUS_VALUES) ?? '',
+    risk_tier: parseEnumParam(searchParams.get('risk_tier'), RISK_TIER_VALUES) ?? '',
+    kyc_status: parseEnumParam(searchParams.get('kyc_status'), KYC_STATUS_VALUES) ?? '',
+    sort: parseEnumParam(searchParams.get('sort'), SORT_VALUES) ?? '-created_at',
   }
 }
 

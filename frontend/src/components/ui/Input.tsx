@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import type { InputHTMLAttributes } from 'react'
 
 type InputProps = InputHTMLAttributes<HTMLInputElement> & {
@@ -6,7 +7,8 @@ type InputProps = InputHTMLAttributes<HTMLInputElement> & {
 }
 
 export function Input({ label, error, id, className = '', ...props }: InputProps) {
-  const inputId = id ?? label.toLowerCase().replace(/\s+/g, '-')
+  const generatedId = useId()
+  const inputId = id ?? generatedId
 
   return (
     <div className="space-y-1.5">

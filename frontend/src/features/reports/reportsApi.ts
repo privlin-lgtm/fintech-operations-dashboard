@@ -1,25 +1,16 @@
-import { getAccessToken } from '@/lib/storage'
+import { apiBlob, apiRequest } from '@/lib/api'
 import { buildQueryString, dateInputToIso, dateInputToIsoEnd } from '@/lib/format'
 import type {
   AlertVolumeReport,
   CaseVolumeReport,
   ExportFormat,
+  ReportSchedule,
+  ReportScheduleCreateInput,
   ReportSearchParams,
   ReportType,
   SlaPerformanceReport,
   TransactionVolumeReport,
 } from '@/types/report'
-
-const API_BASE = import.meta.env.VITE_API_URL ?? '/api/v1'
-
-function authHeaders(): Record<string, string> {
-  const token = getAccessToken()
-  const headers: Record<string, string> = { Accept: 'application/json' }
-  if (token) {
-    headers.Authorization = `Bearer ${token}`
-  }
-  return headers
-}
 
 function buildReportQuery(params: ReportSearchParams, format: ExportFormat = 'json') {
   return buildQueryString({
@@ -30,34 +21,22 @@ function buildReportQuery(params: ReportSearchParams, format: ExportFormat = 'js
   })
 }
 
-async function fetchReport<T>(path: string, params: ReportSearchParams): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}${buildReportQuery(params)}`, {
-    headers: authHeaders(),
-  })
-
-  if (!response.ok) {
-    throw new Error('Failed to load report')
-  }
-
-  return (await response.json()) as T
-}
-
 export async function fetchTransactionReport(
   params: ReportSearchParams,
 ): Promise<TransactionVolumeReport> {
-  return fetchReport<TransactionVolumeReport>('/reports/transactions', params)
+  return apiRequest<TransactionVolumeReport>(`/reports/transactions${buildReportQuery(params)}`)
 }
 
 export async function fetchCaseReport(params: ReportSearchParams): Promise<CaseVolumeReport> {
-  return fetchReport<CaseVolumeReport>('/reports/cases', params)
+  return apiRequest<CaseVolumeReport>(`/reports/cases${buildReportQuery(params)}`)
 }
 
 export async function fetchAlertReport(params: ReportSearchParams): Promise<AlertVolumeReport> {
-  return fetchReport<AlertVolumeReport>('/reports/alerts', params)
+  return apiRequest<AlertVolumeReport>(`/reports/alerts${buildReportQuery(params)}`)
 }
 
 export async function fetchSlaReport(params: ReportSearchParams): Promise<SlaPerformanceReport> {
-  return fetchReport<SlaPerformanceReport>('/reports/sla', params)
+  return apiRequest<SlaPerformanceReport>(`/reports/sla${buildReportQuery(params)}`)
 }
 
 export async function downloadReport(
@@ -65,22 +44,17 @@ export async function downloadReport(
   params: ReportSearchParams,
   format: 'csv' | 'pdf',
 ): Promise<void> {
-  const response = await fetch(
-    `${API_BASE}/reports/${reportType}${buildReportQuery(params, format)}`,
-    { headers: authHeaders() },
-  )
-
-  if (!response.ok) {
-    throw new Error('Failed to download report')
-  }
-
-  const blob = await response.blob()
+  const blob = await apiBlob(`/reports/${reportType}${buildReportQuery(params, format)}`)
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
   anchor.download = `${reportType}-report.${format}`
   anchor.click()
   URL.revokeObjectURL(url)
+}
+
+export async function createReportSchedule(data: ReportScheduleCreateInput): Promise<ReportSchedule> {
+  return apiRequest<ReportSchedule>('/reports/schedules', { method: 'POST', body: data })
 }
 
 export function parseReportSearchParams(

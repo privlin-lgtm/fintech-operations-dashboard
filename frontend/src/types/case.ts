@@ -55,6 +55,12 @@ export type CaseSearchFormValues = {
   sla_risk: boolean
 }
 
+export const CASE_TYPE_OPTIONS = [
+  { label: 'Dispute', value: 'dispute' as const },
+  { label: 'Fraud', value: 'fraud' as const },
+  { label: 'AML review', value: 'aml_review' as const },
+]
+
 export const CASE_STATUS_OPTIONS = [
   { label: 'New', value: 'new' as const },
   { label: 'In progress', value: 'in_progress' as const },

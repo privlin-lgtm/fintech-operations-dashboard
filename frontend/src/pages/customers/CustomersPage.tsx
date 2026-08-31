@@ -1,85 +1,29 @@
-import { useCallback, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useCallback } from 'react'
 
 import { Pagination } from '@/components/ui/Pagination'
 import { CustomerSearchForm } from '@/features/customers/components/CustomerSearchForm'
 import { CustomerTable } from '@/features/customers/components/CustomerTable'
 import { PAGE_SIZE, useCustomerSearch } from '@/features/customers/hooks/useCustomerSearch'
+import { setSearchParam, useCursorPagination } from '@/hooks/useCursorPagination'
 import type { CustomerSearchFormValues } from '@/types/customer'
 
-function applyFormValues(
-  values: CustomerSearchFormValues,
-  setSearchParams: ReturnType<typeof useSearchParams>[1],
-) {
-  const params = new URLSearchParams()
-
-  if (values.q.trim()) {
-    params.set('q', values.q.trim())
-  }
-  if (values.status) {
-    params.set('status', values.status)
-  }
-  if (values.risk_tier) {
-    params.set('risk_tier', values.risk_tier)
-  }
-  if (values.kyc_status) {
-    params.set('kyc_status', values.kyc_status)
-  }
-  if (values.sort) {
-    params.set('sort', values.sort)
-  }
-
-  setSearchParams(params)
-}
-
 export function CustomersPage() {
-  const [searchParams, setSearchParams] = useSearchParams()
-  const [cursorHistory, setCursorHistory] = useState<string[]>([])
   const { data, isLoading, isError } = useCustomerSearch()
-
-  const currentCursor = searchParams.get('cursor')
+  const { applySearchParams, goNext, goPrevious, hasPrevious, summary } =
+    useCursorPagination('customer')
 
   const handleSearch = useCallback(
     (values: CustomerSearchFormValues) => {
-      setCursorHistory([])
-      applyFormValues(values, setSearchParams)
+      const params = new URLSearchParams()
+      setSearchParam(params, 'q', values.q.trim())
+      setSearchParam(params, 'status', values.status)
+      setSearchParam(params, 'risk_tier', values.risk_tier)
+      setSearchParam(params, 'kyc_status', values.kyc_status)
+      setSearchParam(params, 'sort', values.sort)
+      applySearchParams(params)
     },
-    [setSearchParams],
+    [applySearchParams],
   )
-
-  const handleNext = useCallback(() => {
-    if (!data?.next_cursor) {
-      return
-    }
-
-    setCursorHistory((history) => [...history, currentCursor ?? ''])
-    const params = new URLSearchParams(searchParams)
-    params.set('cursor', data.next_cursor)
-    setSearchParams(params)
-  }, [currentCursor, data?.next_cursor, searchParams, setSearchParams])
-
-  const handlePrevious = useCallback(() => {
-    if (cursorHistory.length === 0) {
-      return
-    }
-
-    const previousCursor = cursorHistory[cursorHistory.length - 1]
-    setCursorHistory((history) => history.slice(0, -1))
-
-    const params = new URLSearchParams(searchParams)
-    if (previousCursor) {
-      params.set('cursor', previousCursor)
-    } else {
-      params.delete('cursor')
-    }
-    setSearchParams(params)
-  }, [cursorHistory, searchParams, setSearchParams])
-
-  const summary = useMemo(() => {
-    const count = data?.items.length ?? 0
-    const page = cursorHistory.length + 1
-    return `Page ${page} · Showing ${count} customer${count === 1 ? '' : 's'}`
-  }, [cursorHistory.length, data?.items.length])
 
   return (
     <div className="space-y-6">
@@ -101,11 +45,11 @@ export function CustomersPage() {
 
         {data && data.items.length > 0 ? (
           <Pagination
-            summary={summary}
-            hasPrevious={cursorHistory.length > 0}
+            summary={summary(data.items.length)}
+            hasPrevious={hasPrevious}
             hasNext={Boolean(data.next_cursor)}
-            onPrevious={handlePrevious}
-            onNext={handleNext}
+            onPrevious={goPrevious}
+            onNext={() => goNext(data.next_cursor)}
           />
         ) : null}
       </div>

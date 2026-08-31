@@ -1,5 +1,5 @@
-import type { FormEvent } from 'react'
 import { useState } from 'react'
+import { useForm } from 'react-hook-form'
 import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/Button'
@@ -8,28 +8,42 @@ import { Input } from '@/components/ui/Input'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { ApiError } from '@/lib/api'
 
+type LoginFormValues = {
+  email: string
+  password: string
+  mfa_code: string
+}
+
+const MFA_REQUIRED_DETAIL = 'MFA code required'
+
 export function LoginPage() {
   const { login } = useAuth()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [needsMfaCode, setNeedsMfaCode] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const { register, handleSubmit, getValues, formState } = useForm<LoginFormValues>({
+    defaultValues: { email: '', password: '', mfa_code: '' },
+  })
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  const onSubmit = handleSubmit(async (values) => {
     setError(null)
-    setIsSubmitting(true)
-
     try {
-      await login({ email, password })
+      await login({
+        email: values.email,
+        password: values.password,
+        mfa_code: values.mfa_code || undefined,
+      })
     } catch (err) {
+      if (err instanceof ApiError && err.detail === MFA_REQUIRED_DETAIL) {
+        // Not an error to show — the password was correct, we just need a
+        // second factor now. Reveal the field and let the analyst resubmit.
+        setNeedsMfaCode(true)
+        return
+      }
       const message =
-        err instanceof ApiError ? err.detail ?? 'Invalid email or password.' : 'Sign in failed.'
+        err instanceof ApiError ? (err.detail ?? 'Invalid email or password.') : 'Sign in failed.'
       setError(message)
-    } finally {
-      setIsSubmitting(false)
     }
-  }
+  })
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-brand-700 px-4">
@@ -45,23 +59,41 @@ export function LoginPage() {
         </div>
 
         <Card title="Account access">
-          <form className="space-y-4" onSubmit={(event) => void handleSubmit(event)}>
+          <form className="space-y-4" onSubmit={(event) => void onSubmit(event)}>
             <Input
               label="Email"
               type="email"
               autoComplete="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              disabled={needsMfaCode}
               required
+              {...register('email', { required: true })}
             />
             <Input
               label="Password"
               type="password"
               autoComplete="current-password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              disabled={needsMfaCode}
               required
+              {...register('password', { required: true })}
             />
+
+            {needsMfaCode ? (
+              <div>
+                <Input
+                  label="Authenticator code"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder="6-digit code"
+                  required
+                  {...register('mfa_code', { required: true })}
+                />
+                <p className="mt-1.5 text-sm text-slate-500">
+                  {getValues('email')} has an authenticator app enabled. Enter the current code to
+                  finish signing in.
+                </p>
+              </div>
+            ) : null}
 
             {error ? (
               <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
@@ -74,8 +106,8 @@ export function LoginPage() {
               >
                 Forgot password?
               </Link>
-              <Button type="submit" isLoading={isSubmitting}>
-                Sign in
+              <Button type="submit" isLoading={formState.isSubmitting}>
+                {needsMfaCode ? 'Verify and sign in' : 'Sign in'}
               </Button>
             </div>
           </form>

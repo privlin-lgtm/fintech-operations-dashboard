@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { fetchDashboardSummary } from '@/features/dashboard/dashboardApi'
+import { dashboardKeys } from '@/lib/queryKeys'
 
 type StatCardProps = {
   label: string
@@ -27,7 +28,7 @@ function StatCard({ label, value, tone = 'default' }: StatCardProps) {
 
 export function DashboardPage() {
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['dashboard', 'summary'],
+    queryKey: dashboardKeys.summary(),
     queryFn: fetchDashboardSummary,
   })
 
@@ -63,16 +64,6 @@ export function DashboardPage() {
             />
           </div>
 
-          <Card
-            title="Getting started"
-            description="Module pages are scaffolded in the sidebar and ready for API integration."
-          >
-            <ul className="list-disc space-y-2 pl-5 text-sm text-slate-600">
-              <li>Customers, transactions, cases, and alerts routes are placeholders.</li>
-              <li>Authentication uses JWT tokens from the FastAPI backend.</li>
-              <li>Dashboard metrics are loaded with TanStack Query.</li>
-            </ul>
-          </Card>
         </>
       ) : null}
     </div>

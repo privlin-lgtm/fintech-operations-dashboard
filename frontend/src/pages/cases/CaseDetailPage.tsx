@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { Badge, riskTierTone } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
+import { CaseActionsPanel } from '@/features/cases/components/CaseActionsPanel'
 import { useCaseDetail } from '@/features/cases/hooks/useCaseSearch'
 import { formatDateTime, formatLabel } from '@/lib/format'
 
@@ -106,6 +107,8 @@ export function CaseDetailPage() {
           </Card>
         ) : null}
       </div>
+
+      <CaseActionsPanel caseItem={caseItem} />
     </div>
   )
 }

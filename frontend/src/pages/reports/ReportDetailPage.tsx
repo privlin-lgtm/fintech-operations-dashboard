@@ -13,6 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/Table'
 import { ReportSearchForm } from '@/features/reports/components/ReportSearchForm'
+import { ScheduleReportForm } from '@/features/reports/components/ScheduleReportForm'
 import { downloadReport } from '@/features/reports/reportsApi'
 import { useReport } from '@/features/reports/hooks/useReport'
 import { setSearchParam } from '@/hooks/useCursorPagination'
@@ -69,15 +70,15 @@ function VolumeResultsTable({
 }
 
 export function ReportDetailPage() {
-  const { reportType } = useParams<{ reportType: string }>()
+  const { reportType: rawReportType } = useParams<{ reportType: string }>()
   const [, setSearchParams] = useSearchParams()
   const [isDownloading, setIsDownloading] = useState<'csv' | 'pdf' | null>(null)
 
-  if (!isReportType(reportType)) {
-    return <Navigate to="/reports" replace />
-  }
-
-  const defaultGroupBy = defaultGroupByForReport(reportType)
+  // Every hook below is called unconditionally, on every render, regardless
+  // of whether the :reportType param is valid — the invalid case is handled
+  // by the early return AFTER the hooks, not by skipping the hooks.
+  const reportType = isReportType(rawReportType) ? rawReportType : undefined
+  const defaultGroupBy = reportType ? defaultGroupByForReport(reportType) : ''
   const { data, isLoading, isError } = useReport(reportType)
   const reportMeta = REPORT_TYPE_OPTIONS.find((item) => item.value === reportType)
 
@@ -93,6 +94,7 @@ export function ReportDetailPage() {
   )
 
   const handleDownload = async (format: 'csv' | 'pdf') => {
+    if (!reportType) return
     setIsDownloading(format)
     try {
       const params = new URLSearchParams(window.location.search)
@@ -108,6 +110,10 @@ export function ReportDetailPage() {
     } finally {
       setIsDownloading(null)
     }
+  }
+
+  if (!reportType) {
+    return <Navigate to="/reports" replace />
   }
 
   return (
@@ -230,6 +236,8 @@ export function ReportDetailPage() {
           </Card>
         </div>
       ) : null}
+
+      <ScheduleReportForm reportType={reportType} />
     </div>
   )
 }

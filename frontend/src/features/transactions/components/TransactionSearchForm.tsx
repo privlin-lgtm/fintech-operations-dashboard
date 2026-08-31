@@ -5,7 +5,7 @@ import { useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
-import { toIsoDateInput } from '@/lib/format'
+import { parseEnumParam, toIsoDateInput } from '@/lib/format'
 import type { TransactionSearchFormValues } from '@/types/transaction'
 import {
   TRANSACTION_CHANNEL_OPTIONS,
@@ -14,6 +14,11 @@ import {
   TRANSACTION_STATUS_OPTIONS,
 } from '@/types/transaction'
 
+const STATUS_VALUES = TRANSACTION_STATUS_OPTIONS.map((option) => option.value)
+const CHANNEL_VALUES = TRANSACTION_CHANNEL_OPTIONS.map((option) => option.value)
+const DIRECTION_VALUES = TRANSACTION_DIRECTION_OPTIONS.map((option) => option.value)
+const SORT_VALUES = TRANSACTION_SORT_OPTIONS.map((option) => option.value)
+
 type TransactionSearchFormProps = {
   onSubmit: (values: TransactionSearchFormValues) => void
 }
@@ -21,14 +26,14 @@ type TransactionSearchFormProps = {
 function formValuesFromParams(searchParams: URLSearchParams): TransactionSearchFormValues {
   return {
     q: searchParams.get('q') ?? '',
-    status: (searchParams.get('status') as TransactionSearchFormValues['status']) ?? '',
-    channel: (searchParams.get('channel') as TransactionSearchFormValues['channel']) ?? '',
-    direction: (searchParams.get('direction') as TransactionSearchFormValues['direction']) ?? '',
+    status: parseEnumParam(searchParams.get('status'), STATUS_VALUES) ?? '',
+    channel: parseEnumParam(searchParams.get('channel'), CHANNEL_VALUES) ?? '',
+    direction: parseEnumParam(searchParams.get('direction'), DIRECTION_VALUES) ?? '',
     from_date: toIsoDateInput(searchParams.get('from_date')),
     to_date: toIsoDateInput(searchParams.get('to_date')),
     min_amount: searchParams.get('min_amount') ?? '',
     max_amount: searchParams.get('max_amount') ?? '',
-    sort: (searchParams.get('sort') as TransactionSearchFormValues['sort']) ?? '-created_at',
+    sort: parseEnumParam(searchParams.get('sort'), SORT_VALUES) ?? '-created_at',
   }
 }
 
