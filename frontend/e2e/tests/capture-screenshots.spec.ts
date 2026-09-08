@@ -28,8 +28,12 @@ const screenshotsDir = path.join(docsDir, 'screenshots')
 
 fs.mkdirSync(screenshotsDir, { recursive: true })
 
-async function shoot(page: import('@playwright/test').Page, name: string) {
+async function shoot(page: import('@playwright/test').Page, name: string, options?: { scrollTo?: string }) {
   await page.waitForLoadState('networkidle')
+  if (options?.scrollTo) {
+    await page.locator(options.scrollTo).scrollIntoViewIfNeeded()
+    await page.waitForTimeout(200)
+  }
   await page.screenshot({ path: path.join(screenshotsDir, `${name}.png`) })
 }
 
@@ -74,7 +78,8 @@ test('capture portfolio screenshots', async ({ page }) => {
   const cases = new CasesPage(page)
   await cases.openCaseById(seedData.caseForAssign.id)
   await page.getByRole('heading', { name: seedData.caseForAssign.caseNumber }).waitFor()
-  await shoot(page, 'case-detail')
+  await page.getByTestId('reassign-case-form').waitFor()
+  await shoot(page, 'case-detail', { scrollTo: '[data-testid="reassign-case-form"]' })
 
   // 4. Alert detail — critical sanctions-match triage, pre-resolution.
   await switchUser(page, login, seedData.users.investigator.email, seedData.password)
