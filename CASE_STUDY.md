@@ -104,7 +104,7 @@ Each of these closes a specific gap above — none of them are speculative harde
 - **Two-layer RBAC.** Route-level `require_roles(...)` dependencies gate every endpoint; object-level `enforce_*`/`can_*` predicates in the service layer add ownership and status checks `require_roles` can't express — e.g. an analyst may only view or modify a case they own, and only a team lead or admin may reassign one. The frontend's permission table was rebuilt to match these exact per-action tuples instead of one umbrella "can write" flag.
 
 ![Case detail](docs/screenshots/case-detail.png)
-*Case detail — the notes/close-case actions above are RBAC-gated per role; there's no dedicated audit-trail screen (the audit log is backend-only), so this per-action gating is the clearest visible RBAC signal in the UI.*
+*Case detail — the Reassign form is `case:reassign`, visible only to a team lead or admin; Add note and Close case sit behind their own, different tuples. There's no dedicated audit-trail screen (the audit log is backend-only), so this per-action gating is the clearest visible RBAC signal in the UI.*
 
 ![Alert detail](docs/screenshots/alert-detail.png)
 *Alert triage — a critical sanctions-match alert with resolve and escalate-to-case actions, each writing to the audit log.*
