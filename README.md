@@ -4,6 +4,16 @@ An internal operations tool for a fintech support/fraud/compliance desk:
 customer search, transaction lookup, case management, alerting, and
 reporting, unified behind role-based access control and an audit trail.
 
+## Screenshots
+
+| Case detail | Alert triage | Reports |
+|---|---|---|
+| ![Case detail](docs/screenshots/case-detail.png) | ![Alert detail](docs/screenshots/alert-detail.png) | ![Transaction volume report](docs/screenshots/report-transaction-volume.png) |
+
+More in [`docs/screenshots/`](docs/screenshots/), and a 60-second walkthrough
+at [`docs/walkthrough.mp4`](docs/walkthrough.mp4). Full write-up in
+[CASE_STUDY.md](CASE_STUDY.md).
+
 - **Backend** — FastAPI + SQLAlchemy (async) + PostgreSQL + Alembic. See
   [backend/README.md](backend/README.md) for the full layout and API modules.
 - **Frontend** — React 19 + TypeScript + Tailwind CSS v4 + TanStack Query +
