@@ -78,3 +78,97 @@ transaction, raise or work a case. No narration, no burned-in captions.
 The file list, and **one line per screenshot saying why that screen earned a
 slot**. If something would not run, say what and why rather than quietly
 substituting a weaker screen.
+
+---
+
+# CORRECTION — round 2, written 2026-09-08 after reviewing round 1
+
+Round 1 produced six technically correct screenshots of an almost empty
+application. Do not treat the existing images as a baseline to touch up; this is
+a recapture.
+
+## What went wrong, and whose fault it was
+
+**The brief told you to use the wrong seed. That was the brief's error, not
+yours.** `backend/scripts/seed_e2e.py` is the end-to-end *test* seed: minimal,
+deterministic fixtures built so tests can assert on them. It is not a demo
+dataset.
+
+The result, in the lead image of `CASE_STUDY.md`:
+
+- Open cases **1**, SLA at risk **0**, New alerts **0**, Cases closed today **0**
+- signed in as **"E2E Team Lead"** at `e2e-ops.example`
+- roughly 85% of the frame empty
+
+A reader's first impression of the case study is currently an empty product
+operated by a test account.
+
+## Fix, in order
+
+1. **Get a realistic dataset in.** In rough order of preference:
+   - a demo seed, if one exists anywhere in `backend/scripts` or the alembic data
+     migrations — look before writing anything;
+   - otherwise extend the seeding into a **new** `backend/scripts/seed_demo.py`.
+     Do not modify `seed_e2e.py`; the test suite depends on its exact shape.
+
+   **On the apparent contradiction with the original brief's boundary.** That
+   boundary — "do not change seed data to make the shots look better" — means: do
+   not tune values so one particular screenshot flatters the product. It stands.
+   This is a different thing: `seed_e2e.py` is a *test fixture*, and the original
+   brief was wrong to point at it as a demo dataset. Adding a separate, declared
+   demo seed is not tuning data to flatter a shot; it is using the right dataset
+   for the job. If you find yourself adjusting numbers so a specific tile looks
+   better, that is the boundary and you have crossed it.
+   - Target roughly: 40+ customers, several hundred transactions across a few
+     months, 15-25 cases spread over open/in-progress/closed, 10+ alerts at
+     varying severity, and enough closed-today activity that the dashboard tiles
+     are not all zero.
+2. **Sign in as a realistic user.** A plausible analyst name on a plausible
+   domain. Not `e2e-teamlead@e2e-ops.example`.
+3. **Fix or avoid raw identifiers.** `case-detail.png` currently shows Owner as
+   `37c7316a-8868-4688-be70-7ec6341c50c3`. If the UI genuinely renders a UUID
+   there, **do not fix the UI** — say so in your report and pick a screen that
+   does not expose it. That is a product decision for Paul.
+4. **Frame properly.** Every shot starts at the top of the page with its heading
+   visible. No mid-page scroll positions. If content is shorter than the 900px
+   viewport, crop the image to the content rather than shipping half a frame of
+   background.
+5. **Prefer populated screens over forms.** An empty "Add note" box and a blank
+   "Close case" form demonstrate nothing. A case with a history of notes does.
+
+## WITHDRAWN — the line-ending claim was wrong
+
+An earlier version of this section said `git status` showed 136 modified files of
+line-ending churn and told you to run `git restore .`.
+
+**That was wrong, you were right to refuse it, and the instruction is withdrawn.
+Do not run `git restore .` in this repo.**
+
+What happened: the planning session reads this repo through a Linux mount of a
+Windows folder. Across that mount, git sees a CRLF/LF difference on every text
+file, so `git status` there reports ~140 modified files. From Windows, where you
+run, the same command reports about five. A whitespace-blind diff settles it:
+
+```
+SCREENSHOT-BRIEF.md                     |  65 +++++++++++++++
+docs/screenshots/alert-detail.png       | Bin
+docs/screenshots/case-detail.png        | Bin
+docs/screenshots/customer-search.png    | Bin
+docs/screenshots/transaction-detail.png | Bin
+docs/walkthrough.mp4                    | Bin
+6 files changed
+```
+
+Exactly your five reruns, plus this file. Nothing else really changed.
+`git restore .` from Windows would have discarded your regenerated screenshots
+and walkthrough. Good catch.
+
+The `.gitattributes` suggestion still stands on its own merits — BankOps has one
+and this repo does not — but it is unrelated to any of this and should be raised
+with Paul separately, not folded into a screenshot commit.
+
+## Unchanged from round 1
+
+Do not push. Do not change application behaviour or styling to flatter a
+screenshot. Report one line per image on why that screen earned its slot — and
+this time, if a screen looks bad, say so instead of shipping it.
