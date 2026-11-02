@@ -29,3 +29,4 @@ dist-ssr
 /blob-report/
 /playwright/.cache/
 e2e/.seed-data.json
+e2e/.demo-seed-data.json
