@@ -11,7 +11,7 @@ A full-stack internal platform for a fintech's support, fraud, and compliance de
 | **Stack** | FastAPI (async) · SQLAlchemy 2.0 · PostgreSQL · Alembic · React 19 · TypeScript · TanStack Query · Tailwind CSS v4 · Playwright · GitHub Actions |
 
 ![Operations dashboard](docs/screenshots/operations-dashboard.png)
-*The operations dashboard — live counts of open cases, SLA risk, and new alerts for the signed-in analyst's queue. A 60-second walkthrough is at [docs/walkthrough.mp4](docs/walkthrough.mp4).*
+*The operations dashboard — live counts of open cases, SLA risk, new alerts, and cases closed today, shown here for a team lead on the demo dataset. A 60-second walkthrough is at [docs/walkthrough.mp4](docs/walkthrough.mp4).*
 
 ---
 
@@ -34,7 +34,7 @@ Fraud, support, and compliance teams at a fintech typically work across tools th
 The dashboard was scoped around four personas from the actual requirements spec: a Tier 1/2 support analyst, a fraud/AML investigator, an operations team lead who owns SLA and audit-readiness, and a platform admin managing access. Each persona maps directly onto one of the five backend roles, and the UI shows each of them a different, narrower slice of the same system rather than one generic view with hidden permission checks.
 
 ![Customer search](docs/screenshots/customer-search.png)
-*Customer search — a Tier 1/2 analyst's entry point, with status, risk-tier, and KYC filters and masked PII in the results.*
+*Customer search — a Tier 1/2 analyst's entry point, filtered here to the high-risk book, with status, risk-tier, and KYC filters and masked PII in the results.*
 
 ## 3. Architecture
 
@@ -77,7 +77,7 @@ flowchart LR
 **Frontend.** One feature folder per domain (customers, cases, alerts, transactions, reports), each with its own API client, TanStack Query hooks, and components. A single `<Can permission="...">` gate and a table of permission tuples mirror the backend's role tables exactly, so a button an analyst can't actually use is a button they never see.
 
 ![Transaction detail](docs/screenshots/transaction-detail.png)
-*Transaction detail — a flagged $750,000 wire with its computed risk score, masked counterparty, and status history.*
+*Transaction detail — a flagged $486,250 outbound wire with its risk score, the alerts and case it raised, masked counterparty, and status history.*
 
 **Data.** The domain schema — users/roles, customers/accounts/transactions, cases/notes/links, alerts, reports, and an insert-only audit log — carries soft-delete and timestamp mixins uniformly, and every list endpoint uses keyset (cursor) pagination instead of `OFFSET`.
 
@@ -103,11 +103,11 @@ Each of these closes a specific gap above — none of them are speculative harde
 
 - **Two-layer RBAC.** Route-level `require_roles(...)` dependencies gate every endpoint; object-level `enforce_*`/`can_*` predicates in the service layer add ownership and status checks `require_roles` can't express — e.g. an analyst may only view or modify a case they own, and only a team lead or admin may reassign one. The frontend's permission table was rebuilt to match these exact per-action tuples instead of one umbrella "can write" flag.
 
-![Case detail](docs/screenshots/case-detail.png)
-*Case detail — the Reassign form is `case:reassign`, visible only to a team lead or admin; Add note and Close case sit behind their own, different tuples. There's no dedicated audit-trail screen (the audit log is backend-only), so this per-action gating is the clearest visible RBAC signal in the UI.*
+![Case queue](docs/screenshots/case-queue.png)
+*Case queue — fraud, AML and dispute cases across every workflow state, with priority and SLA due dates, filterable by status, priority, assignee and SLA risk.*
 
-![Alert detail](docs/screenshots/alert-detail.png)
-*Alert triage — a critical sanctions-match alert with resolve and escalate-to-case actions, each writing to the audit log.*
+![Alert queue](docs/screenshots/alert-queue.png)
+*Alert queue — sanctions, velocity, high-risk-transaction, login and watchlist alerts at every severity, from new through escalated and resolved.*
 - **httpOnly, single-use, rotating refresh tokens.** Access tokens live in memory on the client and carry a `token_version` claim for immediate revocation on logout. The refresh token never reaches JavaScript at all — it's a path-scoped httpOnly cookie, rotated and invalidated on every use, with a single-flight lock shared across every code path that might need a fresh token.
 - **A schema-drift CI gate.** A script that builds one database from `schema.sql` and another from `alembic upgrade head`, reflects both structurally, and fails the build on any real difference in tables, columns, indexes, or CHECK constraints — plus two migrations that closed every gap it found on first run.
 - **178 automated tests across three layers.** 133 backend tests (unit, service, API, integration), 37 frontend unit tests, and 8 Playwright end-to-end tests — including a regression test that renders the auth provider under `StrictMode` specifically to keep the refresh-token race from silently coming back.

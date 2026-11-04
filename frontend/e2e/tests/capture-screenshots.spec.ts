@@ -3,159 +3,221 @@ import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
-import { test } from '@playwright/test'
+import { test, type Page } from '@playwright/test'
 
-import { AlertsPage } from '../pages/alerts.page'
-import { CasesPage } from '../pages/cases.page'
-import { CustomersPage } from '../pages/customers.page'
 import { AppShell, LoginPage } from '../pages/login.page'
 import { ReportsPage } from '../pages/reports.page'
 import { TransactionsPage } from '../pages/transactions.page'
-import { seedData } from '../seed-data'
 
 // Portfolio screenshot + walkthrough capture for docs/. Not a regression
-// test: skipped in CI, run manually with
-//   npx playwright test capture-screenshots
-// against a seeded fintech_ops_e2e database (see SCREENSHOT-BRIEF.md).
+// test: skipped in CI, and it only runs against the demo dataset
+// (backend/scripts/seed_demo.py), never the e2e test fixture.
+//
+//   bash:        E2E_SEED=demo npx playwright test capture-screenshots
+//   PowerShell:  $env:E2E_SEED='demo'; npx playwright test capture-screenshots
+//
+// E2E_SEED=demo makes global-setup migrate and seed a fintech_ops_demo
+// database and points the backend at it. Stop any backend already running
+// on port 8000 first: Playwright reuses it, and it would be on the wrong
+// database.
 test.skip(Boolean(process.env.CI), 'manual portfolio capture script, not part of the CI e2e run')
+test.skip(
+  process.env.E2E_SEED !== 'demo',
+  'portfolio capture needs the demo dataset: run with E2E_SEED=demo',
+)
 
-test.use({ viewport: { width: 1440, height: 900 } })
+type DemoSeedData = {
+  password: string
+  users: Record<
+    'team_lead' | 'investigator' | 'investigator_2' | 'analyst' | 'compliance',
+    { id: string; email: string; name: string }
+  >
+  customerSearch: { query: string; name: string; id: string }
+  transaction: { id: string; counterparty: string; amountLabel: string }
+  case: { id: string; caseNumber: string }
+  triageCase: { id: string; caseNumber: string }
+  alert: { id: string; reason: string }
+}
 
 const e2eDir = path.dirname(fileURLToPath(import.meta.url).replace(/tests[/\\]?$/, ''))
 const projectRoot = path.resolve(e2eDir, '../../..')
 const docsDir = path.join(projectRoot, 'docs')
 const screenshotsDir = path.join(docsDir, 'screenshots')
+const demoSeedPath = path.resolve(e2eDir, '..', '.demo-seed-data.json')
 
-fs.mkdirSync(screenshotsDir, { recursive: true })
-
-async function shoot(page: import('@playwright/test').Page, name: string, options?: { scrollTo?: string }) {
-  await page.waitForLoadState('networkidle')
-  if (options?.scrollTo) {
-    await page.locator(options.scrollTo).scrollIntoViewIfNeeded()
-    await page.waitForTimeout(200)
-  }
-  await page.screenshot({ path: path.join(screenshotsDir, `${name}.png`) })
+function loadDemoSeed(): DemoSeedData {
+  return JSON.parse(fs.readFileSync(demoSeedPath, 'utf-8')) as DemoSeedData
 }
 
-// LoginPage.signIn assumes a logged-out session (GuestRoute redirects /login
-// back to / for an authenticated user). Sign out first when switching personas.
-async function switchUser(
-  page: import('@playwright/test').Page,
-  login: LoginPage,
-  email: string,
-  password: string,
-) {
-  const signOut = page.getByRole('button', { name: 'Sign out' })
-  if (await signOut.isVisible().catch(() => false)) {
-    await signOut.click()
-    await page.waitForURL('/login')
-  }
-  await login.signIn(email, password)
+test.use({ viewport: { width: 1440, height: 900 } })
+
+const VIEWPORT = { width: 1440, height: 900 }
+// Shots taller than this are cut, at a table-row boundary when there is one,
+// so a long queue reads as "first screen of the list" rather than a poster.
+const MAX_SHOT_HEIGHT = 960
+const BOTTOM_PADDING = 24
+
+// Every shot starts at the top of the page. The image is cropped to the
+// bottom of the rendered content (main column or sidebar, whichever is
+// taller) so short screens don't ship half a frame of empty background.
+async function shoot(page: Page, name: string) {
+  await page.waitForLoadState('networkidle')
+  await page.evaluate(() => window.scrollTo(0, 0))
+  await page.waitForTimeout(250)
+  const crop = await page.evaluate((limit) => {
+    const main = document.querySelector('main')
+    const bottoms = [main, document.querySelector('aside')]
+      .filter((el): el is Element => el !== null)
+      .map((el) => {
+        // main is a flex-1 column, so measure its children, not the box.
+        const target = el === main ? Array.from(el.children) : [el]
+        return Math.max(...target.map((child) => child.getBoundingClientRect().bottom))
+      })
+    const bottom = Math.ceil(Math.max(...bottoms) + window.scrollY)
+    if (bottom <= limit) return { bottom, cutAtRow: false }
+    const rowBottoms = Array.from(document.querySelectorAll('main tr'))
+      .map((row) => Math.ceil(row.getBoundingClientRect().bottom + window.scrollY))
+      .filter((rowBottom) => rowBottom <= limit)
+    return rowBottoms.length > 0
+      ? { bottom: Math.max(...rowBottoms), cutAtRow: true }
+      : { bottom: limit, cutAtRow: false }
+  }, MAX_SHOT_HEIGHT - BOTTOM_PADDING)
+  // No padding under a cut row, or the next row peeks in.
+  const height = crop.cutAtRow
+    ? crop.bottom
+    : Math.min(Math.max(crop.bottom + BOTTOM_PADDING, 300), MAX_SHOT_HEIGHT)
+  await page.screenshot({
+    path: path.join(screenshotsDir, `${name}.png`),
+    fullPage: height > VIEWPORT.height,
+    clip: { x: 0, y: 0, width: VIEWPORT.width, height },
+  })
 }
 
 test('capture portfolio screenshots', async ({ page }) => {
+  const seed = loadDemoSeed()
+  fs.mkdirSync(screenshotsDir, { recursive: true })
   const login = new LoginPage(page)
   const app = new AppShell(page)
 
-  // 1. Customer search — the analyst persona, mid-search.
-  await switchUser(page, login, seedData.users.analyst.email, seedData.password)
+  // Every still is taken as the team lead: the one persona that can see
+  // every screen, including Reports.
+  await login.signIn(seed.users.team_lead.email, seed.password)
+
+  // 1. Operations dashboard — the landing screen.
+  await page.getByRole('main').getByRole('heading', { name: 'Operations dashboard' }).waitFor()
+  await page.getByText('Cases closed today').waitFor()
+  await shoot(page, 'operations-dashboard')
+
+  // 2. Customer search — filtered to the high-risk book.
   await app.navigateTo('Customers')
-  const customers = new CustomersPage(page)
-  await customers.search('Meridian')
-  await page.getByRole('link', { name: seedData.customers.search.name }).waitFor()
+  await page.getByLabel('Risk tier').selectOption('high')
+  await page.getByRole('button', { name: 'Apply filters' }).click()
+  await page.waitForLoadState('networkidle')
+  await page.getByRole('table').waitFor()
   await shoot(page, 'customer-search')
 
-  // 2. Transaction detail — flagged wire transfer with a risk score.
-  await app.navigateTo('Transactions')
-  const transactions = new TransactionsPage(page)
-  await transactions.openTransaction(seedData.transaction.amountLabel)
-  await page.getByText(seedData.transaction.counterparty).waitFor()
+  // 3. Transaction detail — the flagged outbound wire behind the AML case.
+  await page.goto(`/transactions/${seed.transaction.id}`)
+  await page.getByText(seed.transaction.counterparty).waitFor()
   await shoot(page, 'transaction-detail')
 
-  // 3. Case detail — the strongest screen: SLA, priority, reassign form.
-  // Sign in as team lead so the reassign-case action (team_lead/admin only) is visible.
-  await switchUser(page, login, seedData.users.team_lead.email, seedData.password)
-  const cases = new CasesPage(page)
-  await cases.openCaseById(seedData.caseForAssign.id)
-  await page.getByRole('heading', { name: seedData.caseForAssign.caseNumber }).waitFor()
-  await page.getByTestId('reassign-case-form').waitFor()
-  await shoot(page, 'case-detail', { scrollTo: '[data-testid="reassign-case-form"]' })
+  // 4. Case queue. (Case detail is not shot: it renders the owner as a raw
+  // user UUID, a UI decision left to Paul — see the PR.)
+  await app.navigateTo('Cases')
+  await page.getByRole('link', { name: seed.case.caseNumber }).waitFor()
+  await shoot(page, 'case-queue')
 
-  // 4. Alert detail — critical sanctions-match triage, pre-resolution.
-  await switchUser(page, login, seedData.users.investigator.email, seedData.password)
-  const alerts = new AlertsPage(page)
-  await alerts.openAlertById(seedData.alert.id)
-  await page.getByText(seedData.alert.reason).waitFor()
-  await shoot(page, 'alert-detail')
+  // 5. Alert queue. (Alert detail likewise renders the assignee as a UUID.)
+  await app.navigateTo('Alerts')
+  await page.getByRole('table').waitFor()
+  await shoot(page, 'alert-queue')
 
-  // 5. Reports — populated results grid for a generated report.
-  await switchUser(page, login, seedData.users.team_lead.email, seedData.password)
+  // 6. Reports — transaction volume grouped by channel over the seeded history.
   await app.navigateTo('Reports')
-  const reports = new ReportsPage(page)
-  await reports.openReport('Transaction volume')
-  await reports.expectResults()
+  await new ReportsPage(page).openReport('Transaction volume')
+  const url = new URL(page.url())
+  url.searchParams.set('group_by', 'channel')
+  await page.goto(url.pathname + url.search)
+  await new ReportsPage(page).expectResults()
+  await page.getByRole('cell', { name: 'wire', exact: false }).first().waitFor()
   await shoot(page, 'report-transaction-volume')
-
-  // 6. Operations dashboard — overview landing screen.
-  // No dedicated audit-trail/RBAC screen exists in the app (the audit log is
-  // backend-only); the reassign action gated to team_lead/admin on the case
-  // detail screen above is the closest visible RBAC signal.
-  await page.goto('/')
-  await page.getByRole('main').getByRole('heading', { name: 'Operations dashboard' }).waitFor()
-  await shoot(page, 'operations-dashboard')
 })
 
 test('record portfolio walkthrough', async ({ browser }) => {
-  test.setTimeout(120_000)
+  test.setTimeout(150_000)
+  const seed = loadDemoSeed()
   const videoDir = path.join(docsDir, '_walkthrough-tmp')
   fs.mkdirSync(videoDir, { recursive: true })
 
   const context = await browser.newContext({
-    viewport: { width: 1440, height: 900 },
-    recordVideo: { dir: videoDir, size: { width: 1440, height: 900 } },
+    viewport: VIEWPORT,
+    recordVideo: { dir: videoDir, size: VIEWPORT },
   })
   const page = await context.newPage()
-
   const app = new AppShell(page)
 
-  // One continuous path, paced for a ~70s silent walkthrough: sign in,
-  // search a customer, open a transaction, then work a case.
+  // One continuous path, paced for a ~65s silent walkthrough: an
+  // investigator signs in, checks the alert queue, finds a customer, opens
+  // the flagged wire, then picks up a new case from the queue and adds a
+  // triage note. The case is a new, unassigned one on purpose: case detail
+  // renders an assigned owner as a raw user UUID (left for Paul to decide).
   await page.goto('/login')
-  await page.getByTestId('login-email').pressSequentially(seedData.users.investigator.email, { delay: 60 })
+  await page.getByTestId('login-email').pressSequentially(seed.users.investigator.email, { delay: 50 })
   await page.waitForTimeout(300)
-  await page.getByTestId('login-password').pressSequentially(seedData.password, { delay: 60 })
+  await page.getByTestId('login-password').pressSequentially(seed.password, { delay: 50 })
   await page.waitForTimeout(400)
   await page.getByTestId('login-submit').click()
   await page.waitForURL('/')
   await page.getByText('Welcome back').waitFor()
   await page.waitForTimeout(5000)
 
+  await app.navigateTo('Alerts')
+  await page.getByRole('table').waitFor()
+  await page.waitForTimeout(5000)
+
   await app.navigateTo('Customers')
-  await page.waitForTimeout(2500)
-  const customers = new CustomersPage(page)
-  await page.getByTestId('customer-search-query').pressSequentially('Meridian', { delay: 110 })
+  await page.waitForTimeout(2000)
+  await page
+    .getByTestId('customer-search-query')
+    .pressSequentially(seed.customerSearch.query, { delay: 110 })
   await page.waitForTimeout(500)
   await page.getByRole('button', { name: 'Apply filters' }).click()
-  await page.getByRole('link', { name: seedData.customers.search.name }).waitFor()
-  await page.waitForTimeout(3500)
-  await customers.openCustomer(seedData.customers.search.name)
-  await page.getByRole('heading', { name: seedData.customers.search.name }).waitFor()
-  await page.waitForTimeout(8000)
+  await page.getByRole('link', { name: seed.customerSearch.name }).waitFor()
+  await page.waitForTimeout(3000)
+  await page.getByRole('link', { name: seed.customerSearch.name }).click()
+  await page.getByRole('heading', { name: seed.customerSearch.name }).waitFor()
+  await page.waitForTimeout(7000)
 
   await app.navigateTo('Transactions')
   await page.waitForTimeout(2500)
-  const transactions = new TransactionsPage(page)
-  await transactions.openTransaction(seedData.transaction.amountLabel)
-  await page.getByText(seedData.transaction.counterparty).waitFor()
-  await page.waitForTimeout(9000)
+  await new TransactionsPage(page).openTransaction(seed.transaction.amountLabel)
+  await page.getByText(seed.transaction.counterparty).waitFor()
+  await page.waitForTimeout(8000)
 
   await app.navigateTo('Cases')
+  await page.getByRole('link', { name: seed.case.caseNumber }).waitFor()
   await page.waitForTimeout(2500)
-  await page.getByRole('link', { name: seedData.caseForAssign.caseNumber }).click()
-  await page.getByRole('heading', { name: seedData.caseForAssign.caseNumber }).waitFor()
-  await page.waitForTimeout(4000)
-  await page.mouse.wheel(0, 400)
-  await page.waitForTimeout(11000)
+  await page.getByLabel('Status').selectOption('new')
+  await page.waitForTimeout(800)
+  await page.getByRole('button', { name: 'Apply filters' }).click()
+  await page.getByRole('link', { name: seed.triageCase.caseNumber }).waitFor()
+  await page.waitForTimeout(3000)
+  await page.getByRole('link', { name: seed.triageCase.caseNumber }).click()
+  await page.getByRole('heading', { name: seed.triageCase.caseNumber }).waitFor()
+  await page.waitForTimeout(5000)
+
+  const note = page.getByPlaceholder('What did you find, or what happened next?')
+  await note.scrollIntoViewIfNeeded()
+  await page.waitForTimeout(1500)
+  await note.pressSequentially(
+    'Pulled 30-day card history: three disputed payments at one merchant. Requesting merchant details.',
+    { delay: 35 },
+  )
+  await page.waitForTimeout(800)
+  await page.getByRole('button', { name: 'Add note' }).click()
+  await page.getByText('Requesting merchant details.').first().waitFor()
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'smooth' }))
+  await page.waitForTimeout(8000)
 
   const videoPath = await page.video()?.path()
   await context.close()
@@ -167,11 +229,16 @@ test('record portfolio walkthrough', async ({ browser }) => {
   const mp4Path = path.join(docsDir, 'walkthrough.mp4')
   execFileSync('ffmpeg', [
     '-y',
+    '-loglevel', 'error',
+    // Skip the blank frame before the login page first paints.
+    '-ss', '0.8',
     '-i', videoPath,
     '-vf', 'scale=1280:-2,fps=12',
     '-c:v', 'libx264',
     '-crf', '30',
     '-preset', 'slower',
+    '-pix_fmt', 'yuv420p',
+    '-movflags', '+faststart',
     '-an',
     mp4Path,
   ])
