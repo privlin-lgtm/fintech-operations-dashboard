@@ -26,6 +26,7 @@ from app.repositories.user import UserRepository
 from app.schemas.alert import (
     AlertAssign,
     AlertCreate,
+    AlertDetail,
     AlertEscalate,
     AlertRead,
     AlertResolve,
@@ -73,11 +74,15 @@ class AlertService:
         await self._audit(actor, "create", created.id)
         return AlertRead.model_validate(created)
 
-    async def get_by_id(self, alert_id: UUID, *, viewer: User) -> AlertRead:
+    async def get_by_id(self, alert_id: UUID, *, viewer: User) -> AlertDetail:
         alert = await self._get_or_404(alert_id)
         enforce_view(viewer, alert)
         await self._audit(viewer, "view", alert.id)
-        return AlertRead.model_validate(alert)
+        detail = AlertDetail.model_validate(alert)
+        if alert.assignee_id is not None:
+            assignee = await self.user_repo.get_by_id(alert.assignee_id)
+            detail.assignee_name = assignee.full_name if assignee else None
+        return detail
 
     async def update(self, alert_id: UUID, data: AlertUpdate, actor: User) -> AlertRead:
         alert = await self._get_or_404(alert_id)

@@ -7,7 +7,7 @@ import {
   ALERT_STATUS_OPTIONS,
   ALERT_TYPE_OPTIONS,
 } from '@/types/alert'
-import type { Alert, AlertSearchParams } from '@/types/alert'
+import type { Alert, AlertDetail, AlertSearchParams } from '@/types/alert'
 import type { CasePriority, CaseType } from '@/types/case'
 
 const STATUS_VALUES = ALERT_STATUS_OPTIONS.map((option) => option.value)
@@ -43,8 +43,8 @@ export async function searchAlerts(params: AlertSearchParams): Promise<Paginated
   return apiRequest<PaginatedResponse<Alert>>(`/alerts${query}`)
 }
 
-export async function fetchAlertDetail(alertId: string): Promise<Alert> {
-  return apiRequest<Alert>(`/alerts/${alertId}`)
+export async function fetchAlertDetail(alertId: string): Promise<AlertDetail> {
+  return apiRequest<AlertDetail>(`/alerts/${alertId}`)
 }
 
 export async function assignAlert(alertId: string, data: AssignAlertInput): Promise<Alert> {

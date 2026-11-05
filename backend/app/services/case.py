@@ -86,7 +86,9 @@ class CaseService:
         case = await self._get_or_404(case_id)
         enforce_view(viewer, case)
         await self._audit(viewer, "view", case.id)
-        return CaseDetail.model_validate(case)
+        detail = CaseDetail.model_validate(case)
+        detail.owner_name = await self._user_display_name(case.owner_id)
+        return detail
 
     async def list_cases(
         self,
@@ -262,6 +264,12 @@ class CaseService:
             raise ValidationConflictError(
                 f"Cannot transition from {current!r} to {target!r}"
             )
+
+    async def _user_display_name(self, user_id: UUID | None) -> str | None:
+        if user_id is None:
+            return None
+        user = await self.user_repo.get_by_id(user_id)
+        return user.full_name if user else None
 
     async def _ensure_active_user(self, user_id: UUID) -> None:
         user = await self.user_repo.get_active_by_id(user_id)

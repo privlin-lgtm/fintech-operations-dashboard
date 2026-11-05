@@ -31,6 +31,10 @@ export type Alert = {
   updated_at: string
 }
 
+export type AlertDetail = Alert & {
+  assignee_name: string | null
+}
+
 export type AlertSearchParams = {
   q?: string
   customer_id?: string

@@ -121,16 +121,27 @@ test('capture portfolio screenshots', async ({ page }) => {
   await page.getByText(seed.transaction.counterparty).waitFor()
   await shoot(page, 'transaction-detail')
 
-  // 4. Case queue. (Case detail is not shot: it renders the owner as a raw
-  // user UUID, a UI decision left to Paul — see the PR.)
+  // 4. Case queue.
   await app.navigateTo('Cases')
   await page.getByRole('link', { name: seed.case.caseNumber }).waitFor()
   await shoot(page, 'case-queue')
 
-  // 5. Alert queue. (Alert detail likewise renders the assignee as a UUID.)
+  // 4b. Case detail — the AML case, owner shown by name.
+  await page.goto(`/cases/${seed.case.id}`)
+  await page.getByRole('heading', { name: seed.case.caseNumber }).waitFor()
+  await page.getByTestId('case-owner').waitFor()
+  await shoot(page, 'case-detail')
+
+  // 5. Alert queue.
   await app.navigateTo('Alerts')
   await page.getByRole('table').waitFor()
   await shoot(page, 'alert-queue')
+
+  // 5b. Alert detail — assignee shown by name.
+  await page.goto(`/alerts/${seed.alert.id}`)
+  await page.getByText(seed.alert.reason).waitFor()
+  await page.getByTestId('alert-assignee').waitFor()
+  await shoot(page, 'alert-detail')
 
   // 6. Reports — transaction volume grouped by channel over the seeded history.
   await app.navigateTo('Reports')
@@ -159,8 +170,7 @@ test('record portfolio walkthrough', async ({ browser }) => {
   // One continuous path, paced for a ~65s silent walkthrough: an
   // investigator signs in, checks the alert queue, finds a customer, opens
   // the flagged wire, then picks up a new case from the queue and adds a
-  // triage note. The case is a new, unassigned one on purpose: case detail
-  // renders an assigned owner as a raw user UUID (left for Paul to decide).
+  // triage note on a new, unassigned case.
   await page.goto('/login')
   await page.getByTestId('login-email').pressSequentially(seed.users.investigator.email, { delay: 50 })
   await page.waitForTimeout(300)
