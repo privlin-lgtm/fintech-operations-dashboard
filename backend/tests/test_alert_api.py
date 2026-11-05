@@ -125,3 +125,43 @@ async def test_compliance_auditor_cannot_resolve(client, make_user, make_custome
         headers=_bearer(auditor),
     )
     assert response.status_code == 403
+
+
+async def test_alert_detail_includes_assignee_name(
+    client, db_session, make_user, make_customer
+):
+    investigator = await make_user(email="marcus@example.com", role_name="investigator")
+    analyst = await make_user(email="ava@example.com", role_name="analyst")
+    analyst.full_name = "Ava Chen"
+    await db_session.flush()
+    customer = await make_customer(full_name="Assignee Name Subject")
+
+    create = await client.post(
+        "/api/v1/alerts",
+        json={
+            "customer_id": str(customer.id),
+            "alert_type": AlertType.HIGH_RISK_TXN.value,
+            "severity": AlertSeverity.HIGH.value,
+            "triggering_reason": "Transaction over threshold",
+        },
+        headers=_bearer(investigator),
+    )
+    assert create.status_code == 201
+    alert_id = create.json()["id"]
+
+    unassigned = await client.get(f"/api/v1/alerts/{alert_id}", headers=_bearer(investigator))
+    assert unassigned.status_code == 200
+    assert unassigned.json()["assignee_id"] is None
+    assert unassigned.json()["assignee_name"] is None
+
+    assign = await client.post(
+        f"/api/v1/alerts/{alert_id}/assign",
+        json={"assignee_id": str(analyst.id)},
+        headers=_bearer(investigator),
+    )
+    assert assign.status_code == 200
+
+    detail = await client.get(f"/api/v1/alerts/{alert_id}", headers=_bearer(investigator))
+    assert detail.status_code == 200
+    assert detail.json()["assignee_id"] == str(analyst.id)
+    assert detail.json()["assignee_name"] == "Ava Chen"

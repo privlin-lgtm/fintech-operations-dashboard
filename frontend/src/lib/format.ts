@@ -39,6 +39,24 @@ export function formatLabel(value: string): string {
   return value.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
+/** Role names are snake_case identifiers ("team_lead"); show them in sentence case ("Team lead"). */
+export function formatRoleName(value: string): string {
+  const spaced = value.replace(/_/g, ' ').trim()
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase()
+}
+
+/**
+ * Shows a person reference (case owner, alert assignee) by display name. Falls
+ * back to the raw id only when the API could not resolve a name.
+ */
+export function formatUserRef(name: string | null | undefined, id: string | null): string {
+  if (!id) {
+    return 'Unassigned'
+  }
+
+  return name ?? id
+}
+
 export function formatCurrency(cents: number, currency = 'USD'): string {
   return new Intl.NumberFormat(undefined, {
     style: 'currency',

@@ -124,3 +124,31 @@ async def test_compliance_auditor_is_read_only(client, make_user, make_customer)
         headers=_bearer(auditor),
     )
     assert create.status_code == 403
+
+
+async def test_case_detail_includes_owner_name(client, db_session, make_user, make_customer):
+    investigator = await make_user(email="marcus@example.com", role_name="investigator")
+    investigator.full_name = "Marcus Reed"
+    await db_session.flush()
+    customer = await make_customer(full_name="Owner Name Subject")
+
+    create = await client.post(
+        "/api/v1/cases",
+        json={"customer_id": str(customer.id), "case_type": CaseType.FRAUD.value},
+        headers=_bearer(investigator),
+    )
+    assert create.status_code == 201
+    case_id = create.json()["id"]
+
+    detail = await client.get(f"/api/v1/cases/{case_id}", headers=_bearer(investigator))
+    assert detail.status_code == 200
+    assert detail.json()["owner_id"] == str(investigator.id)
+    assert detail.json()["owner_name"] == "Marcus Reed"
+
+    note = await client.post(
+        f"/api/v1/cases/{case_id}/notes",
+        json={"body": "Checking the owner name survives a note."},
+        headers=_bearer(investigator),
+    )
+    assert note.status_code == 200
+    assert note.json()["owner_name"] == "Marcus Reed"

@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { CaseActionsPanel } from '@/features/cases/components/CaseActionsPanel'
 import { useCaseDetail } from '@/features/cases/hooks/useCaseSearch'
-import { formatDateTime, formatLabel } from '@/lib/format'
+import { formatDateTime, formatLabel, formatUserRef } from '@/lib/format'
 
 export function CaseDetailPage() {
   const { caseId } = useParams<{ caseId: string }>()
@@ -66,7 +66,7 @@ export function CaseDetailPage() {
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-slate-500">Owner</dt>
-              <dd>{caseItem.owner_id ?? 'Unassigned'}</dd>
+              <dd data-testid="case-owner">{formatUserRef(caseItem.owner_name, caseItem.owner_id)}</dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-slate-500">SLA due</dt>

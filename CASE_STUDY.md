@@ -106,8 +106,14 @@ Each of these closes a specific gap above — none of them are speculative harde
 ![Case queue](docs/screenshots/case-queue.png)
 *Case queue — fraud, AML and dispute cases across every workflow state, with priority and SLA due dates, filterable by status, priority, assignee and SLA risk.*
 
+![Case detail](docs/screenshots/case-detail.png)
+*Case detail — owner, SLA due date and investigation notes; Add note and Close case each sit behind their own permission tuple, and the Reassign form below them is `case:reassign`, visible only to a team lead or admin.*
+
 ![Alert queue](docs/screenshots/alert-queue.png)
 *Alert queue — sanctions, velocity, high-risk-transaction, login and watchlist alerts at every severity, from new through escalated and resolved.*
+
+![Alert detail](docs/screenshots/alert-detail.png)
+*Alert triage — a critical sanctions-match alert with resolve and escalate-to-case actions, each writing to the audit log.*
 - **httpOnly, single-use, rotating refresh tokens.** Access tokens live in memory on the client and carry a `token_version` claim for immediate revocation on logout. The refresh token never reaches JavaScript at all — it's a path-scoped httpOnly cookie, rotated and invalidated on every use, with a single-flight lock shared across every code path that might need a fresh token.
 - **A schema-drift CI gate.** A script that builds one database from `schema.sql` and another from `alembic upgrade head`, reflects both structurally, and fails the build on any real difference in tables, columns, indexes, or CHECK constraints — plus two migrations that closed every gap it found on first run.
 - **178 automated tests across three layers.** 133 backend tests (unit, service, API, integration), 37 frontend unit tests, and 8 Playwright end-to-end tests — including a regression test that renders the auth provider under `StrictMode` specifically to keep the refresh-token race from silently coming back.

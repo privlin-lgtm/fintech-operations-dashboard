@@ -17,6 +17,7 @@ from app.models.user import User
 from app.schemas.alert import (
     AlertAssign,
     AlertCreate,
+    AlertDetail,
     AlertEscalate,
     AlertRead,
     AlertResolve,
@@ -65,12 +66,12 @@ async def list_alerts(
     )
 
 
-@router.get("/{alert_id}", response_model=AlertRead)
+@router.get("/{alert_id}", response_model=AlertDetail)
 async def get_alert(
     alert_id: UUID,
     current_user: AlertReaderDep,
     service: AlertServiceDep,
-) -> AlertRead:
+) -> AlertDetail:
     return await service.get_by_id(alert_id, viewer=current_user)
 
 

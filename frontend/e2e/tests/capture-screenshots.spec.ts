@@ -121,16 +121,27 @@ test('capture portfolio screenshots', async ({ page }) => {
   await page.getByText(seed.transaction.counterparty).waitFor()
   await shoot(page, 'transaction-detail')
 
-  // 4. Case queue. (Case detail is not shot: it renders the owner as a raw
-  // user UUID, a UI decision left to Paul — see the PR.)
+  // 4. Case queue.
   await app.navigateTo('Cases')
   await page.getByRole('link', { name: seed.case.caseNumber }).waitFor()
   await shoot(page, 'case-queue')
 
-  // 5. Alert queue. (Alert detail likewise renders the assignee as a UUID.)
+  // 4b. Case detail — the AML case, owner shown by name.
+  await page.goto(`/cases/${seed.case.id}`)
+  await page.getByRole('heading', { name: seed.case.caseNumber }).waitFor()
+  await page.getByTestId('case-owner').waitFor()
+  await shoot(page, 'case-detail')
+
+  // 5. Alert queue.
   await app.navigateTo('Alerts')
   await page.getByRole('table').waitFor()
   await shoot(page, 'alert-queue')
+
+  // 5b. Alert detail — assignee shown by name.
+  await page.goto(`/alerts/${seed.alert.id}`)
+  await page.getByText(seed.alert.reason).waitFor()
+  await page.getByTestId('alert-assignee').waitFor()
+  await shoot(page, 'alert-detail')
 
   // 6. Reports — transaction volume grouped by channel over the seeded history.
   await app.navigateTo('Reports')
