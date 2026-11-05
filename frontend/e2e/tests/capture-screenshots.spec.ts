@@ -170,8 +170,7 @@ test('record portfolio walkthrough', async ({ browser }) => {
   // One continuous path, paced for a ~65s silent walkthrough: an
   // investigator signs in, checks the alert queue, finds a customer, opens
   // the flagged wire, then picks up a new case from the queue and adds a
-  // triage note. The case is a new, unassigned one on purpose: case detail
-  // renders an assigned owner as a raw user UUID (left for Paul to decide).
+  // triage note on a new, unassigned case.
   await page.goto('/login')
   await page.getByTestId('login-email').pressSequentially(seed.users.investigator.email, { delay: 50 })
   await page.waitForTimeout(300)
