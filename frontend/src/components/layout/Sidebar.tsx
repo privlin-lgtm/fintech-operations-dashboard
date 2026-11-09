@@ -17,7 +17,7 @@ const navItems: NavItem[] = [
 
 export function Sidebar() {
   return (
-    <aside className="flex h-full w-64 shrink-0 flex-col bg-sidebar text-white">
+    <aside data-testid="app-sidebar" className="flex w-64 shrink-0 flex-col bg-sidebar text-white">
       <div className="border-b border-white/10 px-5 py-6">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sidebar-muted">
           Fintech Ops

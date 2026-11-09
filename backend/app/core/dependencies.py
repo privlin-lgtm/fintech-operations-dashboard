@@ -28,7 +28,13 @@ from app.services.transaction import TransactionService
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
-async def get_session(session: Annotated[AsyncSession, Depends(get_db_session)]) -> AsyncSession:
+# scope="function": commit (or roll back) before the response is sent. With the
+# default request scope FastAPI runs the code after `yield` once the response
+# has gone out, so a client that refetches as soon as a write returns can read
+# the row before that write is committed.
+async def get_session(
+    session: Annotated[AsyncSession, Depends(get_db_session, scope="function")],
+) -> AsyncSession:
     return session
 
 

@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { AlertActionsPanel } from '@/features/alerts/components/AlertActionsPanel'
 import { useAlertDetail } from '@/features/alerts/hooks/useAlertSearch'
-import { formatDateTime, formatLabel } from '@/lib/format'
+import { formatDateTime, formatLabel, formatUserRef } from '@/lib/format'
 
 export function AlertDetailPage() {
   const { alertId } = useParams<{ alertId: string }>()
@@ -96,7 +96,7 @@ export function AlertDetailPage() {
           </div>
           <div className="flex justify-between gap-4">
             <dt className="text-slate-500">Assignee</dt>
-            <dd>{alert.assignee_id ?? 'Unassigned'}</dd>
+            <dd data-testid="alert-assignee">{formatUserRef(alert.assignee_name, alert.assignee_id)}</dd>
           </div>
           <div className="flex justify-between gap-4">
             <dt className="text-slate-500">Resolved</dt>

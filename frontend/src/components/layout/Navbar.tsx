@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/features/auth/AuthProvider'
+import { formatRoleName } from '@/lib/format'
 
 export function Navbar() {
   const { user, logout } = useAuth()
@@ -14,7 +15,7 @@ export function Navbar() {
       <div className="flex items-center gap-4">
         <div className="hidden text-right sm:block">
           <p className="text-sm font-medium text-slate-900">{user?.email}</p>
-          <p className="text-xs capitalize text-slate-500">{user?.role?.name ?? 'analyst'}</p>
+          <p className="text-xs text-slate-500">{formatRoleName(user?.role?.name ?? 'analyst')}</p>
         </div>
         <Button variant="secondary" size="sm" onClick={() => void logout()}>
           Sign out

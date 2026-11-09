@@ -36,6 +36,7 @@ export type CaseNote = {
 }
 
 export type CaseDetail = Case & {
+  owner_name: string | null
   notes: CaseNote[]
 }
 

@@ -30,6 +30,10 @@ class AlertRead(UUIDSchema, TimestampSchema):
     resolved_at: datetime | None = None
 
 
+class AlertDetail(AlertRead):
+    assignee_name: str | None = None
+
+
 class AlertCreate(ORMModel):
     customer_id: UUID
     alert_type: AlertType
