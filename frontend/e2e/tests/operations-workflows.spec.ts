@@ -39,6 +39,21 @@ test.describe('Fintech operations desk', () => {
     await expect(page).toHaveURL('/')
   })
 
+  test('header role label and full-height sidebar', async ({ page }) => {
+    const login = new LoginPage(page)
+
+    await login.signIn(seedData.users.team_lead.email, seedData.password)
+
+    await expect(page.getByRole('banner').getByText('Team lead', { exact: true })).toBeVisible()
+
+    const viewport = page.viewportSize()
+    const sidebar = await page.getByTestId('app-sidebar').boundingBox()
+    expect(viewport).not.toBeNull()
+    expect(sidebar).not.toBeNull()
+    expect(sidebar!.y).toBe(0)
+    expect(sidebar!.height).toBeGreaterThanOrEqual(viewport!.height)
+  })
+
   test('search customer', async ({ page }) => {
     const login = new LoginPage(page)
     const app = new AppShell(page)
@@ -93,7 +108,11 @@ test.describe('Fintech operations desk', () => {
     await expect(page.getByRole('heading', { name: seedData.caseForAssign.caseNumber })).toBeVisible()
     await cases.reassign(analystId, 'Card fraud specialist coverage for E2E handoff')
 
-    await expect(page.getByText(analystId)).toBeVisible()
+    // The owner reads as the analyst's display name (seed_e2e.py names each
+    // user "E2E <Role>"), not the raw user id that was typed into the form.
+    const owner = page.getByTestId('case-owner')
+    await expect(owner).toHaveText('E2E Analyst')
+    await expect(owner).not.toContainText(analystId)
   })
 
   test('resolve alert', async ({ page }) => {
@@ -104,6 +123,7 @@ test.describe('Fintech operations desk', () => {
     await alerts.openAlertById(seedData.alert.id)
 
     await expect(page.getByText(seedData.alert.reason)).toBeVisible()
+    await expect(page.getByTestId('alert-assignee')).toHaveText('E2E Investigator')
     await alerts.resolve('False positive — beneficiary cleared against OFAC SDN list')
 
     await expect(page.getByText('Resolved', { exact: true })).toBeVisible()

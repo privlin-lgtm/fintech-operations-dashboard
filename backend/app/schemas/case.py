@@ -28,6 +28,7 @@ class CaseRead(UUIDSchema, TimestampSchema):
 
 
 class CaseDetail(CaseRead):
+    owner_name: str | None = None
     notes: list[CaseNoteRead] = []
 
 

@@ -11,9 +11,13 @@ const pythonBin =
     ? path.join(backendDir, '.venv', 'Scripts', 'python.exe')
     : path.join(backendDir, '.venv', 'bin', 'python')
 
+// Keep in step with e2e/global-setup.ts: E2E_SEED=demo points the backend at
+// the demo database the screenshot capture runs against.
 const e2eDatabaseUrl =
   process.env.E2E_DATABASE_URL ??
-  'postgresql+asyncpg://postgres:postgres@localhost:5432/fintech_ops_e2e'
+  (process.env.E2E_SEED === 'demo'
+    ? 'postgresql+asyncpg://postgres:postgres@localhost:5432/fintech_ops_demo'
+    : 'postgresql+asyncpg://postgres:postgres@localhost:5432/fintech_ops_e2e')
 
 export default defineConfig({
   testDir: './e2e/tests',

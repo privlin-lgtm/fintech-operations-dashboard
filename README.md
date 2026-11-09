@@ -6,11 +6,12 @@ reporting, unified behind role-based access control and an audit trail.
 
 ## Screenshots
 
-| Case detail | Alert triage | Reports |
+| Case queue | Alert queue | Reports |
 |---|---|---|
-| ![Case detail](docs/screenshots/case-detail.png) | ![Alert detail](docs/screenshots/alert-detail.png) | ![Transaction volume report](docs/screenshots/report-transaction-volume.png) |
+| ![Case queue](docs/screenshots/case-queue.png) | ![Alert queue](docs/screenshots/alert-queue.png) | ![Transaction volume report](docs/screenshots/report-transaction-volume.png) |
 
-More in [`docs/screenshots/`](docs/screenshots/), and a 60-second walkthrough
+Captured from a demo dataset (`backend/scripts/seed_demo.py`). More in
+[`docs/screenshots/`](docs/screenshots/), and a 60-second walkthrough
 at [`docs/walkthrough.mp4`](docs/walkthrough.mp4). Full write-up in
 [CASE_STUDY.md](CASE_STUDY.md).
 
