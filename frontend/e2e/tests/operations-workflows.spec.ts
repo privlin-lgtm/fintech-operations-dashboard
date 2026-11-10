@@ -109,6 +109,25 @@ test.describe('Fintech operations desk', () => {
     await new CaseClosePage(page).close('activity_explained', 'Documents reconcile with the activity.')
 
     await expect(page.getByTestId('case-resolution')).toHaveText('Activity explained')
+    await expect(page.getByText('Case closed: Activity explained')).toBeVisible()
+    await expect(page.getByText('activity_explained')).toHaveCount(0)
+  })
+
+  test('filter the case queue by owner name', async ({ page }) => {
+    const login = new LoginPage(page)
+    const app = new AppShell(page)
+    const investigator = seedData.users.investigator
+
+    await login.signIn(seedData.users.team_lead.email, seedData.password)
+    await app.navigateTo('Cases')
+
+    const owner = page.getByTestId('case-search-owner')
+    await owner.selectOption({ label: 'E2E Investigator (Investigator)' })
+    await page.getByRole('button', { name: 'Apply filters' }).click()
+
+    await expect(page).toHaveURL(new RegExp(`assignee=${investigator.id}`))
+    await expect(owner.locator('option:checked')).toHaveText('E2E Investigator (Investigator)')
+    await expect(page.getByRole('table').getByRole('link').first()).toBeVisible()
   })
 
   test('assign case', async ({ page }) => {

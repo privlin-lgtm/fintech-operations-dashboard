@@ -10,18 +10,18 @@ type AssigneeSelectProps = Omit<SelectHTMLAttributes<HTMLSelectElement>, 'childr
   /** Leave this person out of the list, e.g. a case's current owner. */
   excludeId?: string | null
   error?: string
+  /** Label for the empty choice; also keeps the picker usable with no people loaded (e.g. "Anyone" in a filter). */
+  emptyLabel?: string
 }
 
 /** Pick a person by name; the form still submits their id. */
-export function AssigneeSelect({ label, excludeId, error, disabled, ...props }: AssigneeSelectProps) {
+export function AssigneeSelect({ label, excludeId, error, emptyLabel, disabled, ...props }: AssigneeSelectProps) {
   const { data, isPending, isError, error: loadError } = useAssignableUsers()
 
   const people = (data ?? []).filter((person) => person.id !== excludeId)
   const placeholder = isPending
     ? 'Loading people…'
-    : people.length === 0
-      ? 'No one available'
-      : 'Choose a person'
+    : (emptyLabel ?? (people.length === 0 ? 'No one available' : 'Choose a person'))
 
   const options = [
     { label: placeholder, value: '' },
@@ -35,7 +35,7 @@ export function AssigneeSelect({ label, excludeId, error, disabled, ...props }: 
     <Select
       label={label}
       options={options}
-      disabled={disabled || isPending || people.length === 0}
+      disabled={disabled || isPending || (!emptyLabel && people.length === 0)}
       error={error ?? (isError ? `Could not load people: ${errorMessage(loadError)}` : undefined)}
       {...props}
     />

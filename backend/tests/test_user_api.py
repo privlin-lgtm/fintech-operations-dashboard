@@ -62,14 +62,21 @@ async def test_investigator_can_list_for_alert_assignment(client, make_user):
     assert response.status_code == 200
 
 
-async def test_analyst_and_auditor_are_forbidden(client, make_user):
-    analyst = await make_user(email="ava@example.com", role_name="analyst")
+async def test_auditor_can_list_for_the_case_search_filter(client, make_user):
     auditor = await make_user(email="audit@example.com", role_name="compliance_auditor")
 
-    for user in (analyst, auditor):
-        response = await client.get(URL, headers=bearer_headers(user))
-        assert response.status_code == 403
-        assert response.headers["content-type"] == "application/problem+json"
+    response = await client.get(URL, headers=bearer_headers(auditor))
+
+    assert response.status_code == 200
+
+
+async def test_analyst_is_forbidden(client, make_user):
+    analyst = await make_user(email="ava@example.com", role_name="analyst")
+
+    response = await client.get(URL, headers=bearer_headers(analyst))
+
+    assert response.status_code == 403
+    assert response.headers["content-type"] == "application/problem+json"
 
 
 async def test_requires_authentication(client):

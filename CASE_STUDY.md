@@ -4,7 +4,7 @@ A full-stack internal platform for a fintech's support, fraud, and compliance de
 
 | | |
 |---|---|
-| **Automated tests** | 213, gating every push |
+| **Automated tests** | 220, gating every push |
 | **RBAC roles** | 5, enforced at 2 layers |
 | **Schema migrations** | 9, all reversible |
 | **CI jobs** | 4, across 2 workflows |
@@ -19,7 +19,7 @@ A full-stack internal platform for a fintech's support, fraud, and compliance de
 
 An internal operations dashboard that gives a fintech's support, fraud, and compliance teams one system of record instead of three disconnected ones. It covers the full lifecycle a case actually follows in the real world: a transaction trips a fraud rule, an alert lands in the queue, an investigator triages and escalates it into a case, the case gets worked and closed with a documented resolution — and every step of that thread, plus every read of sensitive customer data along the way, lands in an immutable audit log.
 
-The backend is an async FastAPI service on PostgreSQL with a layered repository/service architecture; the frontend is a React 19 + TypeScript single-page app with role-aware UI gating that mirrors the backend's permissions exactly. Both sides carry their own CI: 140 backend tests, 61 frontend unit tests, and a full Playwright end-to-end suite that spins up a real Postgres instance and drives the actual app through a browser — all gating every push via GitHub Actions.
+The backend is an async FastAPI service on PostgreSQL with a layered repository/service architecture; the frontend is a React 19 + TypeScript single-page app with role-aware UI gating that mirrors the backend's permissions exactly. Both sides carry their own CI: 143 backend tests, 64 frontend unit tests, and a full Playwright end-to-end suite that spins up a real Postgres instance and drives the actual app through a browser — all gating every push via GitHub Actions.
 
 It was built the way a real engineering org actually ships this kind of system: an architecture design pass, a staff-level code review, a full security audit, and a release-readiness review — each one followed all the way through to implementing every remediation, not just producing a findings list.
 
@@ -66,10 +66,10 @@ flowchart LR
 ```mermaid
 flowchart LR
     Push["git push"] --> CI["GitHub Actions"]
-    CI --> T1["backend: test<br/>140 pytest cases"]
+    CI --> T1["backend: test<br/>143 pytest cases"]
     CI --> T2["schema-drift<br/>schema.sql vs. migrations"]
-    CI --> T3["frontend: test<br/>61 vitest cases + build"]
-    CI --> T4["e2e<br/>12 Playwright, real Postgres"]
+    CI --> T3["frontend: test<br/>64 vitest cases + build"]
+    CI --> T4["e2e<br/>13 Playwright, real Postgres"]
 ```
 
 **Backend layering.** FastAPI routes depend only on services (never touch the database directly); services depend on repositories and hold every business rule — status-transition validation, object-level permission checks, audit-log writes; repositories hold nothing but query construction. Every dependency is constructor-injected through FastAPI's own DI graph, so a service can be unit-tested against fake repositories with no database at all.
@@ -116,7 +116,7 @@ Each of these closes a specific gap above — none of them are speculative harde
 *Alert triage — a critical sanctions-match alert with resolve and escalate-to-case actions, each writing to the audit log.*
 - **httpOnly, single-use, rotating refresh tokens.** Access tokens live in memory on the client and carry a `token_version` claim for immediate revocation on logout. The refresh token never reaches JavaScript at all — it's a path-scoped httpOnly cookie, rotated and invalidated on every use, with a single-flight lock shared across every code path that might need a fresh token.
 - **A schema-drift CI gate.** A script that builds one database from `schema.sql` and another from `alembic upgrade head`, reflects both structurally, and fails the build on any real difference in tables, columns, indexes, or CHECK constraints — plus two migrations that closed every gap it found on first run.
-- **213 automated tests across three layers.** 140 backend tests (unit, service, API, integration), 61 frontend unit tests, and 12 Playwright end-to-end tests — including a regression test that renders the auth provider under `StrictMode` specifically to keep the refresh-token race from silently coming back.
+- **220 automated tests across three layers.** 143 backend tests (unit, service, API, integration), 64 frontend unit tests, and 13 Playwright end-to-end tests — including a regression test that renders the auth provider under `StrictMode` specifically to keep the refresh-token race from silently coming back.
 
 ## 6. Security considerations
 
@@ -161,7 +161,7 @@ Ready to drop into a resume or LinkedIn project entry — each one is a real, ve
 - Migrated session authentication from JSON-body refresh tokens to httpOnly rotating cookies; diagnosed and fixed a React 18 StrictMode concurrency race against the single-use token via a shared single-flight refresh lock.
 - Built a custom schema-drift CI check that structurally diffs a hand-maintained schema reference against live Alembic migrations, surfacing and closing 10 missing indexes, 10 missing triggers, and 5 missing data-integrity constraints via two new reversible migrations.
 - Led a self-directed security audit covering JWT handling, authorization, injection classes, XSS/CSRF, secrets management, and logging; implemented every remediation, including Fernet-encrypted MFA secrets, exponential-backoff account lockout, and structured audit logging of access-denied events.
-- Established a 213-test automated suite (backend unit/integration, frontend unit, Playwright E2E) gated in GitHub Actions across 4 CI jobs and 2 workflows, including a Postgres-backed end-to-end run on every push.
+- Established a 220-test automated suite (backend unit/integration, frontend unit, Playwright E2E) gated in GitHub Actions across 4 CI jobs and 2 workflows, including a Postgres-backed end-to-end run on every push.
 - Implemented keyset/cursor pagination and trigram-indexed fuzzy search across the customer, transaction, case, and alert domains to keep list and search performance flat as tables grow.
 
 ## 10. Interview talking points
