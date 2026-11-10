@@ -9,18 +9,13 @@ import {
   useCloseCase,
   useReassignCase,
 } from '@/features/cases/hooks/useCaseSearch'
-import type { ApiError } from '@/lib/api'
+import { AssigneeSelect } from '@/features/users/components/AssigneeSelect'
+import { errorMessage } from '@/lib/errors'
 import type { CaseDetail } from '@/types/case'
 
 type AddNoteValues = { body: string }
 type CloseCaseValues = { resolution_code: string; closing_summary: string; status: 'closed_resolved' | 'closed_no_action' }
 type ReassignValues = { owner_id: string; reason: string }
-
-function errorMessage(error: unknown): string | null {
-  if (!error) return null
-  const apiError = error as ApiError
-  return apiError.detail ?? apiError.message ?? 'Something went wrong.'
-}
 
 function AddNoteForm({ caseId }: { caseId: string }) {
   const mutation = useAddCaseNote(caseId)
@@ -117,7 +112,7 @@ function CloseCaseForm({ caseId }: { caseId: string }) {
   )
 }
 
-function ReassignForm({ caseId }: { caseId: string }) {
+function ReassignForm({ caseId, currentOwnerId }: { caseId: string; currentOwnerId: string | null }) {
   const mutation = useReassignCase(caseId)
   const { register, handleSubmit, reset, formState } = useForm<ReassignValues>({
     defaultValues: { owner_id: '', reason: '' },
@@ -133,21 +128,14 @@ function ReassignForm({ caseId }: { caseId: string }) {
       onSubmit={(event) => void onSubmit(event)}
       className="space-y-3"
     >
-      <div className="space-y-1.5">
-        <label htmlFor="reassign-owner" className="block text-sm font-medium text-slate-700">
-          New owner (user ID)
-        </label>
-        <input
-          id="reassign-owner"
-          data-testid="reassign-case-owner"
-          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
-          placeholder="Owner UUID"
-          {...register('owner_id', { required: 'Choose who this case is going to.' })}
-        />
-        {formState.errors.owner_id ? (
-          <p className="text-sm text-red-600">{formState.errors.owner_id.message}</p>
-        ) : null}
-      </div>
+      <AssigneeSelect
+        id="reassign-owner"
+        data-testid="reassign-case-owner"
+        label="New owner"
+        excludeId={currentOwnerId}
+        error={formState.errors.owner_id?.message}
+        {...register('owner_id', { required: 'Choose who this case is going to.' })}
+      />
       <div className="space-y-1.5">
         <label htmlFor="reassign-reason" className="block text-sm font-medium text-slate-700">
           Reason
@@ -196,7 +184,7 @@ export function CaseActionsPanel({ caseItem }: { caseItem: CaseDetail }) {
           </Can>
           <Can permission="case:reassign">
             <Card title="Reassign">
-              <ReassignForm caseId={caseItem.id} />
+              <ReassignForm caseId={caseItem.id} currentOwnerId={caseItem.owner_id} />
             </Card>
           </Can>
         </>

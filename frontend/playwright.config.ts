@@ -48,6 +48,10 @@ export default defineConfig({
         DEBUG: 'true',
         APP_ENV: 'development',
         JWT_SECRET_KEY: process.env.JWT_SECRET_KEY ?? 'e2e-test-secret-key-minimum-32-characters',
+        // Every test signs in fresh from one IP, so the default 10/minute login
+        // limit trips once the suite has more than ~10 tests. The limit
+        // only changes for this local test server; the app default stays 10/minute.
+        LOGIN_RATE_LIMIT: process.env.LOGIN_RATE_LIMIT ?? '200/minute',
       },
     },
     {

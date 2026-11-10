@@ -20,6 +20,13 @@ export type User = {
   role: Role | null
 }
 
+/** A person a case or alert can be handed to (GET /users/assignable). */
+export type AssignableUser = {
+  id: string
+  full_name: string
+  role: string
+}
+
 export type DashboardSummary = {
   open_cases: number
   sla_at_risk: number

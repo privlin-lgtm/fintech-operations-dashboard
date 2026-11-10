@@ -5,19 +5,13 @@ import { Card } from '@/components/ui/Card'
 import { Select } from '@/components/ui/Select'
 import { Can } from '@/features/auth/Can'
 import { useCreateReportSchedule } from '@/features/reports/hooks/useReport'
-import type { ApiError } from '@/lib/api'
+import { errorMessage } from '@/lib/errors'
 import { REPORT_CADENCE_OPTIONS } from '@/types/report'
 import type { ReportCadence, ReportType } from '@/types/report'
 
 type ScheduleFormValues = {
   cadence: ReportCadence
   recipients: string
-}
-
-function errorMessage(error: unknown): string | null {
-  if (!error) return null
-  const apiError = error as ApiError
-  return apiError.detail ?? apiError.message ?? 'Something went wrong.'
 }
 
 function ScheduleReportFormInner({ reportType }: { reportType: ReportType }) {
