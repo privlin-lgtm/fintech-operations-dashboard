@@ -19,6 +19,8 @@ export const PERMISSIONS = {
   'alert:resolve': ['investigator', 'team_lead', 'admin'],
   'report:read': ['analyst', 'investigator', 'team_lead', 'compliance_auditor', 'admin'],
   'report:schedule': ['team_lead', 'compliance_auditor', 'admin'],
+  // GET /users/assignable (core/user_permissions.py ASSIGNABLE_USERS_READ_ROLES).
+  'user:assignable': ['investigator', 'team_lead', 'compliance_auditor', 'admin'],
 } as const satisfies Record<string, readonly string[]>
 
 export type Permission = keyof typeof PERMISSIONS

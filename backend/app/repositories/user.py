@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.core.config import get_settings
+from app.models.role import Role
 from app.models.user import User
 from app.repositories.base import BaseRepository
 
@@ -35,6 +36,23 @@ class UserRepository(BaseRepository[User]):
         )
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def list_active_by_roles(self, role_names: tuple[str, ...]) -> list[User]:
+        """Active, non-deleted users whose (non-deleted) role is one of role_names, by name."""
+        stmt = (
+            select(User)
+            .join(User.role)
+            .options(selectinload(User.role))
+            .where(
+                User.deleted_at.is_(None),
+                User.status == "active",
+                Role.deleted_at.is_(None),
+                Role.name.in_(role_names),
+            )
+            .order_by(User.full_name, User.id)
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
 
     async def update_last_login(self, user: User) -> User:
         user.last_login_at = datetime.now(UTC)

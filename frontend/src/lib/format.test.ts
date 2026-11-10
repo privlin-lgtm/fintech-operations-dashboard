@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatRoleName, formatUserRef } from '@/lib/format'
+import { formatCaseType, formatResolutionCode, formatRoleName, formatUserRef } from '@/lib/format'
 
 describe('formatRoleName', () => {
   it('turns a snake_case role into sentence case', () => {
@@ -27,5 +27,27 @@ describe('formatUserRef', () => {
 
   it('falls back to the id only when no name came back', () => {
     expect(formatUserRef(null, 'user-id')).toBe('user-id')
+  })
+})
+
+describe('formatCaseType', () => {
+  it('uses the form label, keeping AML in capitals', () => {
+    expect(formatCaseType('aml_review')).toBe('AML review')
+    expect(formatCaseType('fraud')).toBe('Fraud')
+  })
+
+  it('falls back to sentence case for an unknown type', () => {
+    expect(formatCaseType('chargeback_review')).toBe('Chargeback review')
+  })
+})
+
+describe('formatResolutionCode', () => {
+  it('reads a snake_case code as plain words', () => {
+    expect(formatResolutionCode('activity_explained')).toBe('Activity explained')
+    expect(formatResolutionCode('fraud_confirmed')).toBe('Fraud confirmed')
+  })
+
+  it('shows a dash when there is no resolution', () => {
+    expect(formatResolutionCode(null)).toBe('—')
   })
 })

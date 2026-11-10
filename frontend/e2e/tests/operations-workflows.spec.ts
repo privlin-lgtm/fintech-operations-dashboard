@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 
 import { AlertsPage } from '../pages/alerts.page'
-import { CasesPage, CustomerCasePage } from '../pages/cases.page'
+import { CaseClosePage, CasesPage, CustomerCasePage } from '../pages/cases.page'
 import { CustomersPage } from '../pages/customers.page'
 import { AppShell, LoginPage } from '../pages/login.page'
 import { ReportsPage } from '../pages/reports.page'
@@ -93,8 +93,41 @@ test.describe('Fintech operations desk', () => {
 
     await customerCases.openCase('High')
     await expect(page).toHaveURL(/\/cases\//)
-    await expect(page.getByText('fraud case', { exact: false })).toBeVisible()
+    await expect(page.getByTestId('case-type')).toHaveText('Fraud case')
     await expect(page.getByText('High', { exact: true })).toBeVisible()
+  })
+
+  test('closed case shows its resolution in plain words', async ({ page }) => {
+    const login = new LoginPage(page)
+    const customerCases = new CustomerCasePage(page)
+
+    await login.signIn(seedData.users.investigator.email, seedData.password)
+    await page.goto(`/customers/${seedData.customers.openCase.id}`)
+    await customerCases.openCase('Medium')
+    await expect(page).toHaveURL(/\/cases\//)
+
+    await new CaseClosePage(page).close('activity_explained', 'Documents reconcile with the activity.')
+
+    await expect(page.getByTestId('case-resolution')).toHaveText('Activity explained')
+    await expect(page.getByText('Case closed: Activity explained')).toBeVisible()
+    await expect(page.getByText('activity_explained')).toHaveCount(0)
+  })
+
+  test('filter the case queue by owner name', async ({ page }) => {
+    const login = new LoginPage(page)
+    const app = new AppShell(page)
+    const investigator = seedData.users.investigator
+
+    await login.signIn(seedData.users.team_lead.email, seedData.password)
+    await app.navigateTo('Cases')
+
+    const owner = page.getByTestId('case-search-owner')
+    await owner.selectOption({ label: 'E2E Investigator (Investigator)' })
+    await page.getByRole('button', { name: 'Apply filters' }).click()
+
+    await expect(page).toHaveURL(new RegExp(`assignee=${investigator.id}`))
+    await expect(owner.locator('option:checked')).toHaveText('E2E Investigator (Investigator)')
+    await expect(page.getByRole('table').getByRole('link').first()).toBeVisible()
   })
 
   test('assign case', async ({ page }) => {
@@ -106,13 +139,81 @@ test.describe('Fintech operations desk', () => {
     await cases.openCaseById(seedData.caseForAssign.id)
 
     await expect(page.getByRole('heading', { name: seedData.caseForAssign.caseNumber })).toBeVisible()
-    await cases.reassign(analystId, 'Card fraud specialist coverage for E2E handoff')
+    // The new owner is picked by name (seed_e2e.py names each user "E2E <Role>");
+    // nobody types a user id any more.
+    await cases.reassign('E2E Analyst (Analyst)', 'Card fraud specialist coverage for E2E handoff')
 
-    // The owner reads as the analyst's display name (seed_e2e.py names each
-    // user "E2E <Role>"), not the raw user id that was typed into the form.
     const owner = page.getByTestId('case-owner')
     await expect(owner).toHaveText('E2E Analyst')
     await expect(owner).not.toContainText(analystId)
+  })
+
+  test('a 422 from reassign shows a message instead of crashing the case page', async ({ page }) => {
+    // Regression: FastAPI's 422 sends `detail` as an array of {loc, msg}. The
+    // form used to render that array as a React child and white-screen the page.
+    const login = new LoginPage(page)
+    const cases = new CasesPage(page)
+
+    await page.route('**/api/v1/cases/*/reassign', (route) =>
+      route.fulfill({
+        status: 422,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          detail: [
+            {
+              type: 'uuid_parsing',
+              loc: ['body', 'owner_id'],
+              msg: 'Input should be a valid UUID',
+              input: 'not-a-uuid',
+            },
+          ],
+        }),
+      }),
+    )
+
+    await login.signIn(seedData.users.team_lead.email, seedData.password)
+    await cases.openCaseById(seedData.caseForAssign.id)
+    await cases.reassign('E2E Team Lead (Team lead)', 'Checking the error path')
+
+    await expect(page.getByText('Owner id: Input should be a valid UUID')).toBeVisible()
+    await expect(page.getByRole('heading', { name: seedData.caseForAssign.caseNumber })).toBeVisible()
+    await expect(page.getByTestId('reassign-case-submit')).toBeVisible()
+  })
+
+  test('assign alert by name', async ({ page, request }) => {
+    const login = new LoginPage(page)
+    const alerts = new AlertsPage(page)
+    const investigator = seedData.users.investigator
+
+    // A fresh "new" alert, so the Assign form is on screen. seed_e2e.py
+    // deletes every alert on its E2E customers at the start of each run.
+    // `request` is its own context, so this API sign-in leaves no refresh
+    // cookie in the browser (which would skip the login page below).
+    const tokenResponse = await request.post('/api/v1/auth/login', {
+      data: { email: investigator.email, password: seedData.password },
+    })
+    expect(tokenResponse.ok()).toBeTruthy()
+    const { access_token: accessToken } = (await tokenResponse.json()) as { access_token: string }
+    const created = await request.post('/api/v1/alerts', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      data: {
+        customer_id: seedData.customers.alert.id,
+        alert_type: 'velocity',
+        severity: 'medium',
+        triggering_reason: 'E2E assign-by-name check: burst of card payments',
+      },
+    })
+    expect(created.status()).toBe(201)
+    const { id: alertId } = (await created.json()) as { id: string }
+
+    await login.signIn(investigator.email, seedData.password)
+    await alerts.openAlertById(alertId)
+    await expect(page.getByTestId('alert-assignee')).toHaveText('Unassigned')
+
+    await alerts.assign('E2E Analyst (Analyst)')
+
+    await expect(page.getByTestId('alert-assignee')).toHaveText('E2E Analyst')
+    await expect(page.getByText('Assigned', { exact: true })).toBeVisible()
   })
 
   test('resolve alert', async ({ page }) => {

@@ -13,6 +13,7 @@ from app.core.case_permissions import (
     is_closed,
 )
 from app.core.exceptions import ConflictError, NotFoundError, ValidationConflictError
+from app.core.labels import resolution_label
 from app.core.pagination import Cursor, decode_cursor, paginate
 from app.core.sla import SLA_HOURS
 from app.models.case import Case, CaseNote, CaseTransactionLink
@@ -211,7 +212,7 @@ class CaseService:
         case.closing_summary = data.closing_summary
         case.closed_at = datetime.now(UTC)
         await self._add_system_note(
-            case.id, actor.id, f"Case closed: {data.resolution_code}"
+            case.id, actor.id, f"Case closed: {resolution_label(data.resolution_code)}"
         )
         await self.repo.session.flush()
         await self.repo.session.refresh(case)

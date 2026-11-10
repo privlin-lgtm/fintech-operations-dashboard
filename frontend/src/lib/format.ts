@@ -1,3 +1,5 @@
+import { CASE_TYPE_OPTIONS } from '@/types/case'
+
 /**
  * Validates a URL param against a known set of allowed values instead of
  * blindly `as`-casting it. A hand-edited or bookmarked URL with `?status=bogus`
@@ -39,10 +41,25 @@ export function formatLabel(value: string): string {
   return value.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
+/** snake_case identifiers ("activity_explained") as sentence-case words ("Activity explained"). */
+export function formatSentenceCase(value: string): string {
+  const spaced = value.replace(/_/g, ' ').replace(/\s+/g, ' ').trim()
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase()
+}
+
 /** Role names are snake_case identifiers ("team_lead"); show them in sentence case ("Team lead"). */
 export function formatRoleName(value: string): string {
-  const spaced = value.replace(/_/g, ' ').trim()
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase()
+  return formatSentenceCase(value)
+}
+
+/** Case types use their form labels ("aml_review" → "AML review"); unknown ones fall back to sentence case. */
+export function formatCaseType(value: string): string {
+  return CASE_TYPE_OPTIONS.find((option) => option.value === value)?.label ?? formatSentenceCase(value)
+}
+
+/** Resolution codes are free-text snake_case ("activity_explained" → "Activity explained"). */
+export function formatResolutionCode(value: string | null | undefined): string {
+  return value ? formatSentenceCase(value) : '—'
 }
 
 /**

@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/Table'
 import { useCustomerProfile } from '@/features/customers/hooks/useCustomerSearch'
 import { OpenCasePanel } from '@/features/cases/components/OpenCasePanel'
-import { formatDateTime, formatLabel } from '@/lib/format'
+import { formatCaseType, formatDateTime, formatLabel } from '@/lib/format'
 
 function StatBlock({ label, value }: { label: string; value: number }) {
   return (
@@ -151,7 +151,7 @@ export function CustomerDetailPage() {
                     <TableCell className="font-medium text-slate-900">
                       {caseItem.case_number}
                     </TableCell>
-                    <TableCell>{formatLabel(caseItem.case_type)}</TableCell>
+                    <TableCell>{formatCaseType(caseItem.case_type)}</TableCell>
                     <TableCell>{formatLabel(caseItem.status)}</TableCell>
                   </TableRow>
                 ))}

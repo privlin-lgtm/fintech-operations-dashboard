@@ -152,3 +152,27 @@ async def test_case_detail_includes_owner_name(client, db_session, make_user, ma
     )
     assert note.status_code == 200
     assert note.json()["owner_name"] == "Marcus Reed"
+
+
+async def test_close_note_reads_resolution_in_plain_words(client, make_user, make_case):
+    investigator = await make_user(email="marcus@example.com", role_name="investigator")
+    case = await make_case(owner_id=investigator.id)
+    headers = _bearer(investigator)
+
+    close = await client.post(
+        f"/api/v1/cases/{case.id}/close",
+        json={
+            "resolution_code": "activity_explained",
+            "closing_summary": "Supporting documents reconcile with the wire activity.",
+            "status": "closed_no_action",
+        },
+        headers=headers,
+    )
+    assert close.status_code == 200
+    # The code itself is stored as sent; only the human-read note uses words.
+    assert close.json()["resolution_code"] == "activity_explained"
+
+    detail = await client.get(f"/api/v1/cases/{case.id}", headers=headers)
+    system_notes = [n["body"] for n in detail.json()["notes"] if n["is_system"]]
+    assert "Case closed: Activity explained" in system_notes
+    assert not any("activity_explained" in body for body in system_notes)

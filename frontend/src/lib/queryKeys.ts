@@ -48,3 +48,8 @@ export const dashboardKeys = {
   all: ['dashboard'] as const,
   summary: () => [...dashboardKeys.all, 'summary'] as const,
 }
+
+export const userKeys = {
+  all: ['users'] as const,
+  assignable: () => [...userKeys.all, 'assignable'] as const,
+}

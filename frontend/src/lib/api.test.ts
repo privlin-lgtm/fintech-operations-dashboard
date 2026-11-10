@@ -160,4 +160,22 @@ describe('lib/api', () => {
     expect((error as ApiError).status).toBe(409)
     expect((error as ApiError).detail).toBe('Email already exists')
   })
+
+  it('flattens a FastAPI 422 validation array into a string detail', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        { detail: [{ type: 'uuid_parsing', loc: ['body', 'owner_id'], msg: 'Input should be a valid UUID' }] },
+        { status: 422 },
+      ),
+    )
+
+    const error = await apiRequest('/cases/abc/reassign', { method: 'POST', body: {} }).catch(
+      (err: unknown) => err,
+    )
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect((error as ApiError).status).toBe(422)
+    expect((error as ApiError).detail).toBe('Owner id: Input should be a valid UUID')
+    expect((error as ApiError).message).toBe('Owner id: Input should be a valid UUID')
+  })
 })

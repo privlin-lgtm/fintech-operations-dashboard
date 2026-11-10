@@ -12,6 +12,12 @@ export class AlertsPage {
     await this.page.goto(`/alerts/${alertId}`)
   }
 
+  /** assigneeLabel is the picker option, e.g. "E2E Analyst (Analyst)". */
+  async assign(assigneeLabel: string) {
+    await this.page.getByTestId('assign-alert-assignee').selectOption({ label: assigneeLabel })
+    await this.page.getByRole('button', { name: 'Assign alert' }).click()
+  }
+
   async resolve(reason: string) {
     await this.page.getByTestId('resolve-alert-reason').fill(reason)
     await this.page.getByRole('button', { name: 'Resolve alert' }).click()

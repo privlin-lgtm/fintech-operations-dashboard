@@ -32,3 +32,11 @@ class UserRead(UserBase, UUIDSchema, TimestampSchema):
 
 class UserInDB(UserRead):
     hashed_password: str
+
+
+class AssignableUser(ORMModel):
+    """The minimum a person picker needs: who they are and what they do."""
+
+    id: UUID
+    full_name: str
+    role: str

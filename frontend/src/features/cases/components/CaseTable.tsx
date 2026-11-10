@@ -10,7 +10,7 @@ import {
   TableHeaderCell,
   TableRow,
 } from '@/components/ui/Table'
-import { formatDateTime, formatLabel } from '@/lib/format'
+import { formatCaseType, formatDateTime, formatLabel } from '@/lib/format'
 import type { Case } from '@/types/case'
 
 type CaseTableProps = {
@@ -66,7 +66,7 @@ export function CaseTable({ cases, isLoading, isError }: CaseTableProps) {
                 {caseItem.case_number}
               </Link>
             </TableCell>
-            <TableCell>{formatLabel(caseItem.case_type)}</TableCell>
+            <TableCell>{formatCaseType(caseItem.case_type)}</TableCell>
             <TableCell>{formatLabel(caseItem.status)}</TableCell>
             <TableCell>
               <Badge tone={riskTierTone(caseItem.priority)}>

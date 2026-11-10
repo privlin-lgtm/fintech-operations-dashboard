@@ -10,7 +10,8 @@ import {
   useEscalateAlert,
   useResolveAlert,
 } from '@/features/alerts/hooks/useAlertSearch'
-import type { ApiError } from '@/lib/api'
+import { AssigneeSelect } from '@/features/users/components/AssigneeSelect'
+import { errorMessage } from '@/lib/errors'
 import { CASE_PRIORITY_OPTIONS, CASE_TYPE_OPTIONS } from '@/types/case'
 import type { CasePriority, CaseType } from '@/types/case'
 import type { Alert } from '@/types/alert'
@@ -19,12 +20,6 @@ type AssignValues = { assigneeId: string }
 type ResolveValues = { reason: string }
 type EscalateExistingValues = { caseId: string }
 type EscalateNewValues = { caseType: CaseType; priority: CasePriority }
-
-function errorMessage(error: unknown): string | null {
-  if (!error) return null
-  const apiError = error as ApiError
-  return apiError.detail ?? apiError.message ?? 'Something went wrong.'
-}
 
 function AssignForm({ alertId }: { alertId: string }) {
   const mutation = useAssignAlert(alertId)
@@ -45,21 +40,13 @@ function AssignForm({ alertId }: { alertId: string }) {
       onSubmit={(event) => void onSubmit(event)}
       className="space-y-3"
     >
-      <div className="space-y-1.5">
-        <label htmlFor="assignee-id" className="block text-sm font-medium text-slate-700">
-          Assignee (user ID)
-        </label>
-        <input
-          id="assignee-id"
-          data-testid="assign-alert-assignee"
-          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
-          placeholder="Analyst or investigator UUID"
-          {...register('assigneeId', { required: 'Choose who should own this alert.' })}
-        />
-        {formState.errors.assigneeId ? (
-          <p className="text-sm text-red-600">{formState.errors.assigneeId.message}</p>
-        ) : null}
-      </div>
+      <AssigneeSelect
+        id="assignee-id"
+        data-testid="assign-alert-assignee"
+        label="Assignee"
+        error={formState.errors.assigneeId?.message}
+        {...register('assigneeId', { required: 'Choose who should own this alert.' })}
+      />
       {mutation.isError ? <p className="text-sm text-red-600">{errorMessage(mutation.error)}</p> : null}
       <Button type="submit" size="sm" isLoading={mutation.isPending}>
         Assign alert

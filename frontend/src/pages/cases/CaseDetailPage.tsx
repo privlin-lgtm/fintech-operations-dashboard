@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { CaseActionsPanel } from '@/features/cases/components/CaseActionsPanel'
 import { useCaseDetail } from '@/features/cases/hooks/useCaseSearch'
-import { formatDateTime, formatLabel, formatUserRef } from '@/lib/format'
+import { formatCaseType, formatDateTime, formatLabel, formatResolutionCode, formatUserRef } from '@/lib/format'
 
 export function CaseDetailPage() {
   const { caseId } = useParams<{ caseId: string }>()
@@ -40,7 +40,9 @@ export function CaseDetailPage() {
             ← Back to case search
           </Link>
           <h1 className="mt-2 text-2xl font-semibold text-slate-900">{caseItem.case_number}</h1>
-          <p className="mt-1 text-sm text-slate-500">{formatLabel(caseItem.case_type)} case</p>
+          <p className="mt-1 text-sm text-slate-500" data-testid="case-type">
+            {formatCaseType(caseItem.case_type)} case
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Badge>{formatLabel(caseItem.status)}</Badge>
@@ -78,7 +80,7 @@ export function CaseDetailPage() {
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-slate-500">Resolution</dt>
-              <dd>{caseItem.resolution_code ?? '—'}</dd>
+              <dd data-testid="case-resolution">{formatResolutionCode(caseItem.resolution_code)}</dd>
             </div>
           </dl>
         </Card>

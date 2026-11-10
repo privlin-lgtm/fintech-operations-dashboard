@@ -45,6 +45,7 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
+from app.core.labels import resolution_label
 from app.core.security import hash_password
 from app.models.account import Account
 from app.models.alert import Alert
@@ -542,7 +543,7 @@ def _cases(
                                  created_at=at, updated_at=at))
         if case.closed_at is not None:
             session.add(CaseNote(case_id=case.id, author_id=author.id, is_system=True,
-                                 body=f"Case closed: {case.resolution_code}.",
+                                 body=f"Case closed: {resolution_label(case.resolution_code)}.",
                                  created_at=case.closed_at, updated_at=case.closed_at))
 
     # Link transactions: the flagged one, plus a couple of others from the same customer.

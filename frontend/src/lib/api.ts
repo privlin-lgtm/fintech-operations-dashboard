@@ -1,3 +1,4 @@
+import { describeErrorDetail } from '@/lib/errors'
 import type { TokenResponse } from '@/types/auth'
 
 export class ApiError extends Error {
@@ -128,8 +129,11 @@ async function authFetch(path: string, options: RequestOptions, attempt = 0): Pr
 async function throwForResponse(response: Response): Promise<never> {
   let detail: string | undefined
   try {
-    const problem = (await response.json()) as { detail?: string }
-    detail = problem.detail
+    const problem = (await response.json()) as { detail?: unknown }
+    // FastAPI's own 422 sends `detail` as an array of {loc, msg} objects, not
+    // the string our problem+json handlers send. Flatten it here so no caller
+    // ever ends up rendering an object as a React child.
+    detail = describeErrorDetail(problem.detail)
   } catch {
     detail = undefined
   }

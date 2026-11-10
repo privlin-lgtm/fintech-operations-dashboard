@@ -3,8 +3,10 @@ import { useForm } from 'react-hook-form'
 import { useSearchParams } from 'react-router-dom'
 
 import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
+import { AssigneeSelect } from '@/features/users/components/AssigneeSelect'
+import { useAssignableUsers } from '@/features/users/useAssignableUsers'
+import { useHasPermission } from '@/hooks/useHasPermission'
 import { parseEnumParam } from '@/lib/format'
 import type { CaseSearchFormValues } from '@/types/case'
 import { CASE_PRIORITY_OPTIONS, CASE_STATUS_OPTIONS } from '@/types/case'
@@ -27,13 +29,25 @@ function formValuesFromParams(searchParams: URLSearchParams): CaseSearchFormValu
 
 export function CaseSearchForm({ onSubmit }: CaseSearchFormProps) {
   const [searchParams] = useSearchParams()
-  const { register, handleSubmit, reset } = useForm<CaseSearchFormValues>({
+  // Analysts only ever see their own cases (the backend pins the owner), so
+  // the owner filter is only offered to roles that can list people.
+  const canFilterByOwner = useHasPermission('user:assignable')
+  const { data: people } = useAssignableUsers({ enabled: canFilterByOwner })
+  const { register, handleSubmit, reset, getValues, setValue } = useForm<CaseSearchFormValues>({
     defaultValues: formValuesFromParams(searchParams),
   })
 
   useEffect(() => {
     reset(formValuesFromParams(searchParams))
   }, [reset, searchParams])
+
+  // A select can't show an owner (e.g. from the URL) until that person's
+  // option exists, so push the form's current value back into the DOM once
+  // the list arrives. Uses the form's own value, never the URL, so a pick
+  // the user already made is kept.
+  useEffect(() => {
+    if (people) setValue('assignee', getValues('assignee'))
+  }, [people, getValues, setValue])
 
   return (
     <form
@@ -50,7 +64,14 @@ export function CaseSearchForm({ onSubmit }: CaseSearchFormProps) {
         options={[{ label: 'All priorities', value: '' }, ...CASE_PRIORITY_OPTIONS]}
         {...register('priority')}
       />
-      <Input label="Assignee ID" placeholder="Owner UUID" {...register('assignee')} />
+      {canFilterByOwner ? (
+        <AssigneeSelect
+          label="Owner"
+          emptyLabel="Anyone"
+          data-testid="case-search-owner"
+          {...register('assignee')}
+        />
+      ) : null}
       <label className="flex items-end gap-2 pb-2 text-sm text-slate-700">
         <input type="checkbox" className="rounded border-slate-300" {...register('sla_risk')} />
         SLA at risk only
